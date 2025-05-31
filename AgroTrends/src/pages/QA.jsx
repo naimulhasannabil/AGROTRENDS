@@ -73,17 +73,17 @@ function QA() {
                   Category
                 </label>
                 <select
-                  id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  required
-                >
-                  <option value="">Select a category</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
+  id="category"
+  value={category}
+  onChange={(e) => setCategory(e.target.value)}
+  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
+  required
+>
+  <option value="">Select a category</option>
+  {categories.map((cat) => (
+    <option key={cat} value={cat}>{cat}</option>
+  ))}
+</select>
               </div>
               <div className="mb-4">
                 <label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-1">
@@ -121,9 +121,9 @@ function QA() {
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-xl font-semibold">{faq.question}</h3>
-                    <span className="bg-primary-100 text-primary-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                      {faq.category}
-                    </span>
+                   <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+  {faq.category}
+</span>
                   </div>
                   <p className="text-gray-700 mb-4">{faq.answer}</p>
                   <div className="text-sm text-gray-500">

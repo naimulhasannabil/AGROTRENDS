@@ -189,7 +189,7 @@ function Courses() {
       </section>
       
       {/* Testimonials Section */}
-      <section className="py-16 bg-primary-50">
+      <section className="py-16 bg-[#DAFCE7]">
         <div className="container-custom">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">What Our Students Say</h2>
