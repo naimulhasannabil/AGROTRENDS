@@ -1,0 +1,231 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply font-sans text-gray-800 min-h-screen;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+  
+  h1 {
+    @apply text-3xl sm:text-4xl md:text-5xl leading-tight;
+  }
+  
+  h2 {
+    @apply text-2xl sm:text-3xl md:text-4xl leading-tight;
+  }
+  
+  h3 {
+    @apply text-xl sm:text-2xl md:text-3xl leading-snug;
+  }
+  
+  h4 {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+  
+  h5 {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+  
+  h6 {
+    @apply text-sm sm:text-base md:text-lg;
+  }
+
+  img {
+    @apply max-w-full h-auto;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 text-center;
+  }
+  
+  .btn-primary {
+    @apply btn bg-primary-600 hover:bg-primary-700 text-white focus:ring-primary-500;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-white hover:bg-gray-100 text-primary-700 border border-primary-600 focus:ring-primary-500;
+  }
+  
+  .container-custom {
+    @apply container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
+  }
+  
+  .nav-link {
+    @apply text-gray-700 hover:text-primary-700 transition duration-300;
+  }
+  
+  .nav-link-active {
+    @apply text-primary-700 font-medium;
+  }
+  
+  .section {
+    @apply py-8 sm:py-12 md:py-16 lg:py-20;
+  }
+
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-md overflow-hidden transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg;
+  }
+
+  .card-image {
+    @apply w-full h-48 sm:h-56 object-cover;
+  }
+
+  .card-body {
+    @apply p-4 sm:p-6;
+  }
+
+  .form-input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out;
+}
+
+/* Responsive text utilities */
+.text-responsive {
+  @apply text-base sm:text-lg md:text-xl;
+}
+
+.text-responsive-sm {
+  @apply text-sm sm:text-base md:text-lg;
+}
+
+/* Responsive spacing utilities */
+.spacing-responsive {
+  @apply p-4 sm:p-6 md:p-8;
+}
+
+.margin-responsive {
+  @apply my-4 sm:my-6 md:my-8;
+}
+
+/* Responsive grid utilities */
+.grid-cols-responsive {
+  @apply grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4;
+}
+
+/* Responsive flex utilities */
+.flex-responsive {
+  @apply flex flex-col sm:flex-row;
+}
+
+/* Responsive width utilities */
+.w-responsive {
+  @apply w-full sm:w-auto;
+}
+
+
+/* :root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+} */
