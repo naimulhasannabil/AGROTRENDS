@@ -4,6 +4,8 @@ import HeroSection from '../components/HeroSection'
 import FeatureCard from '../components/FeatureCard'
 import BlogCard from '../components/BlogCard'
 import CategoryFilter from '../components/CategoryFilter'
+import WeatherWidget from '../components/WeatherWidget'
+import AIInsights from '../components/AIInsights'
 
 // Icons for feature cards
 const BookIcon = ({ className }) => (
@@ -133,6 +135,15 @@ function Home() {
       {/* Latest Insights Section */}
       <section className="py-16 bg-gray-50">
         <div className="container-custom">
+          {/* AI Dashboard */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <div className="lg:col-span-2">
+              <AIInsights />
+            </div>
+            <div>
+              <WeatherWidget />
+            </div>
+          </div>
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Latest Insights</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
