@@ -48,7 +48,7 @@ function Navbar() {
             <NavLink to="/blogs" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
               Blogs
             </NavLink>
-            <div className="relative">
+            {/* <div className="relative">
               <button 
                 className="nav-link flex items-center"
                 onClick={toggleCategories}
@@ -77,7 +77,10 @@ function Navbar() {
                   </div>
                 </div>
               )}
-            </div>
+            </div> */}
+            <NavLink to="/categories" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
+              Categories
+            </NavLink>
             <NavLink to="/products" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
               Products
             </NavLink>
@@ -89,6 +92,9 @@ function Navbar() {
             </NavLink>
             <NavLink to="/events" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
               Events
+            </NavLink>
+            <NavLink to="/ai-assistant" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
+              AI Assistant
             </NavLink>
             <NavLink to="/sign-up" className="btn-primary ml-4 rounded-2xl">
               Sign Up
@@ -111,7 +117,7 @@ function Navbar() {
             <NavLink to="/blogs" className="block nav-link py-2" onClick={closeMenu}>
               Blogs
             </NavLink>
-            <div>
+            {/* <div>
               <button 
                 className="flex justify-between w-full nav-link py-2"
                 onClick={toggleCategories}
@@ -137,7 +143,10 @@ function Navbar() {
                   </Link>
                 </div>
               )}
-            </div>
+            </div> */}
+            <NavLink to="/categories" className="block nav-link py-2" onClick={closeMenu}>
+              Categories
+            </NavLink>
             <NavLink to="/products" className="block nav-link py-2" onClick={closeMenu}>
               Products
             </NavLink>
@@ -149,6 +158,9 @@ function Navbar() {
             </NavLink>
             <NavLink to="/events" className="block nav-link py-2" onClick={closeMenu}>
               Events
+            </NavLink>
+            <NavLink to="/ai-assistant" className="block nav-link py-2" onClick={closeMenu}>
+              AI Assistant
             </NavLink>
             <div className="flex flex-col space-y-2 pt-2">
               <NavLink to="/sign-up" className="btn-primary text-center py-2 rounded-2xl" onClick={closeMenu}>

@@ -42,14 +42,14 @@ function Categories() {
       <HeroSection 
         title="Farming Categories"
         subtitle="Explore comprehensive resources for all aspects of modern agriculture"
-        backgroundClass="bg-primary-50"
+        backgroundClass="bg-[#DAFCE7]"
       />
       
       <section className="py-16 bg-white">
         <div className="container-custom">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {categories.map(category => (
-              <div key={category.id} className="bg-white rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:-translate-y-2 hover:shadow-xl">
+              <div key={category.id} className="bg-[#DAFCE7] rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:-translate-y-2 hover:shadow-xl">
                 <div className="relative">
                   <img 
                     src={category.image} 

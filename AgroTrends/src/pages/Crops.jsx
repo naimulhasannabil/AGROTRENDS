@@ -30,7 +30,7 @@ function Crops() {
       growthPeriod: "90-120 days",
       waterRequirement: "High",
       soilType: "Clay or clay loam",
-      image: "https://images.pexels.com/photos/1598073/pexels-photo-1598073.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/247616/pexels-photo-247616.jpeg",
       description: "A staple food crop that feeds more than half of the world's population.",
       tips: ["Maintain flooded fields", "Control weeds early", "Harvest at proper moisture content"]
     },
@@ -82,7 +82,7 @@ function Crops() {
       growthPeriod: "70-120 days",
       waterRequirement: "Medium",
       soilType: "Loose, well-drained soil",
-      image: "https://images.pexels.com/photos/162801/potatoes-vegetables-erdfrucht-bio-162801.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/144248/potatoes-vegetables-erdfrucht-bio-144248.jpeg",
       description: "A starchy tuber crop that is the fourth-largest food crop in the world.",
       tips: ["Hill soil around plants", "Avoid green potatoes", "Harvest before frost"]
     }
@@ -105,7 +105,7 @@ function Crops() {
       <HeroSection 
         title="Crop Management"
         subtitle="Comprehensive guide to growing healthy and productive crops"
-        backgroundClass="bg-primary-50"
+        backgroundClass="bg-[#DAFCE7]"
       />
       
       {/* Search and Filters */}
