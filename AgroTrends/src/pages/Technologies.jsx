@@ -93,7 +93,7 @@ function Technologies() {
       <HeroSection 
         title="Agricultural Technologies"
         subtitle="Cutting-edge innovations transforming modern farming practices"
-        backgroundClass="bg-primary-50"
+        backgroundClass="bg-[#DAFCE7]"
       />
       
       {/* Search and Filters */}
