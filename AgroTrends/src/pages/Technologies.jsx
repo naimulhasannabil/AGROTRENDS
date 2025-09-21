@@ -234,7 +234,7 @@ function Technologies() {
         </div>
       </section>
       
-      {/* Technologies Grid */}
+      {/* Technologies Grid
       <section className="py-8 bg-gray-50">
         <div className="container-custom">
           <div className="max-w-4xl mx-auto mb-8">
@@ -321,7 +321,7 @@ function Technologies() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
     </>
   )
 }

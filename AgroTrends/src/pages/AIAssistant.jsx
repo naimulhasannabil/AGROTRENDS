@@ -85,7 +85,7 @@ function AIAssistant() {
       <HeroSection 
         title="AI Farming Assistant"
         subtitle="Get instant expert advice powered by artificial intelligence"
-        backgroundClass="bg-gradient-to-r from-primary-50 to-blue-50"
+        backgroundClass="bg-gradient-to-r bg-[#DAFCE7] to-blue-50"
       />
       
       {/* AI Tools Section */}

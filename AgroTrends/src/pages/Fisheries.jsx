@@ -17,7 +17,7 @@ function Fisheries() {
       growthPeriod: "6-8 months",
       temperature: "25-30°C",
       oxygenRequirement: "5-8 mg/L",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/27605577/pexels-photo-27605577.jpeg",
       description: "Fast-growing freshwater fish ideal for aquaculture with high protein content.",
       managementTips: ["Maintain water quality", "Feed 2-3 times daily", "Monitor oxygen levels"]
     },
@@ -30,7 +30,7 @@ function Fisheries() {
       growthPeriod: "18-24 months",
       temperature: "8-14°C",
       oxygenRequirement: "6-9 mg/L",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/5209866/pexels-photo-5209866.jpeg",
       description: "Premium fish species with high market value and excellent nutritional profile.",
       managementTips: ["Cold water systems", "High-quality feed", "Disease prevention protocols"]
     },
@@ -43,7 +43,7 @@ function Fisheries() {
       growthPeriod: "12-18 months",
       temperature: "24-29°C",
       oxygenRequirement: "4-6 mg/L",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/19040471/pexels-photo-19040471.jpeg",
       description: "Hardy freshwater fish with excellent feed conversion and disease resistance.",
       managementTips: ["Bottom feeding habits", "Aeration systems", "Regular water testing"]
     },
@@ -56,7 +56,7 @@ function Fisheries() {
       growthPeriod: "3-4 months",
       temperature: "26-30°C",
       oxygenRequirement: "5-7 mg/L",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/1483780/pexels-photo-1483780.jpeg",
       description: "High-value crustacean with rapid growth and excellent market demand.",
       managementTips: ["Maintain salinity levels", "Probiotics supplementation", "Biosecurity measures"]
     },
@@ -69,7 +69,7 @@ function Fisheries() {
       growthPeriod: "10-12 months",
       temperature: "20-25°C",
       oxygenRequirement: "4-6 mg/L",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/33927023/pexels-photo-33927023.jpeg",
       description: "Versatile freshwater fish suitable for polyculture systems and various climates.",
       managementTips: ["Polyculture compatible", "Omnivorous feeding", "Pond management"]
     },
@@ -82,7 +82,7 @@ function Fisheries() {
       growthPeriod: "12-15 months",
       temperature: "10-16°C",
       oxygenRequirement: "7-10 mg/L",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/5995690/pexels-photo-5995690.jpeg",
       description: "Cold-water fish with premium market value and specific environmental requirements.",
       managementTips: ["Cold water systems", "High oxygen demand", "Quality feed pellets"]
     }
@@ -105,7 +105,7 @@ function Fisheries() {
       <HeroSection 
         title="Fisheries & Aquaculture"
         subtitle="Sustainable fish farming techniques and aquaculture management"
-        backgroundClass="bg-primary-50"
+        backgroundClass="bg-[#DAFCE7]"
       />
       
       {/* Search and Filters */}

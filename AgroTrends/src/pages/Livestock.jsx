@@ -30,7 +30,7 @@ function Livestock() {
       lifespan: "15-20 years",
       feedRequirement: "High",
       spaceRequirement: "1-3 acres per head",
-      image: "https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/15267108/pexels-photo-15267108.jpeg",
       description: "Premium beef cattle breed known for marbled meat and efficient feed conversion.",
       careGuide: ["Rotational grazing", "Quality feed supplements", "Regular hoof trimming"]
     },
@@ -43,7 +43,7 @@ function Livestock() {
       lifespan: "5-8 years",
       feedRequirement: "Low",
       spaceRequirement: "4 sq ft per bird",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/18474455/pexels-photo-18474455.jpeg",
       description: "Hardy dual-purpose chickens excellent for both egg laying and meat production.",
       careGuide: ["Secure coop at night", "Balanced layer feed", "Fresh water access"]
     },
@@ -56,7 +56,7 @@ function Livestock() {
       lifespan: "10-12 years",
       feedRequirement: "Medium",
       spaceRequirement: "200-300 sq ft per pig",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/18773841/pexels-photo-18773841.jpeg",
       description: "Lean meat pigs with excellent feed conversion and rapid growth rates.",
       careGuide: ["Provide wallowing area", "High-protein feed", "Regular health monitoring"]
     },
@@ -69,7 +69,7 @@ function Livestock() {
       lifespan: "12-15 years",
       feedRequirement: "Medium",
       spaceRequirement: "200-500 sq ft per goat",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/8502546/pexels-photo-8502546.jpeg",
       description: "High-butterfat milk producers with distinctive long ears and Roman noses.",
       careGuide: ["Provide climbing structures", "Quality hay and browse", "Hoof trimming every 6-8 weeks"]
     },
@@ -82,7 +82,7 @@ function Livestock() {
       lifespan: "10-12 years",
       feedRequirement: "Medium",
       spaceRequirement: "5-10 sheep per acre",
-      image: "https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      image: "https://images.pexels.com/photos/5490708/pexels-photo-5490708.jpeg",
       description: "Premium wool producers known for fine, soft fleece and adaptability.",
       careGuide: ["Annual shearing", "Parasite prevention", "Rotational grazing"]
     }
@@ -105,7 +105,7 @@ function Livestock() {
       <HeroSection 
         title="Livestock Management"
         subtitle="Expert guidance for raising healthy and productive livestock"
-        backgroundClass="bg-primary-50"
+        backgroundClass="bg-[#DAFCE7]"
       />
       
       {/* Search and Filters */}
