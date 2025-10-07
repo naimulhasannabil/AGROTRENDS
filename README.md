@@ -96,7 +96,6 @@ AgroTrends is an innovative knowledge-sharing platform that connects farmers, ag
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd agrotrends
    ```
 
 2. **Install dependencies**
