@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import HeroSection from '../components/HeroSection'
+import { useState, useEffect, useRef } from 'react'
 import geminiService from '../services/geminiService'
 
 function AIAssistant() {
@@ -14,7 +13,7 @@ function AIAssistant() {
   const [inputMessage, setInputMessage] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [selectedTool, setSelectedTool] = useState('chat')
-  const [diseaseImage, setDiseaseImage] = useState(null)
+  const [, setDiseaseImage] = useState(null)
   const [yieldForm, setYieldForm] = useState({
     crop: '',
     fieldSize: '',
@@ -22,6 +21,10 @@ function AIAssistant() {
     soilType: ''
   })
   const [yieldPrediction, setYieldPrediction] = useState(null)
+  const [isListening, setIsListening] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const messagesEndRef = useRef(null)
+  const recognitionRef = useRef(null)
   
   // AI Tools
   const aiTools = [
@@ -50,6 +53,77 @@ function AIAssistant() {
       icon: '📊'
     }
   ]
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      recognitionRef.current = new SpeechRecognition()
+      recognitionRef.current.continuous = false
+      recognitionRef.current.interimResults = false
+      recognitionRef.current.lang = 'en-US'
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript
+        setInputMessage(transcript)
+        setIsListening(false)
+      }
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error)
+        setIsListening(false)
+      }
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false)
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+      }
+    }
+  }, [])
+
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in your browser.')
+      return
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    } else {
+      recognitionRef.current.start()
+      setIsListening(true)
+    }
+  }
+
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = 0.9
+      utterance.pitch = 1
+      utterance.volume = 1
+      window.speechSynthesis.speak(utterance)
+    }
+  }
+
+  const clearChat = () => {
+    setMessages([{
+      id: 1,
+      type: 'ai',
+      content: 'Hello! I\'m your AI farming assistant powered by Google Gemini. How can I assist you today?',
+      timestamp: new Date().toLocaleTimeString()
+    }])
+  }
   
   const handleSendMessage = async (e) => {
     e.preventDefault()
@@ -107,7 +181,7 @@ function AIAssistant() {
         
         // Display results
         alert(`Disease Analysis Result:\n\n${analysis}`)
-      } catch (error) {
+      } catch {
         alert('Error analyzing image. Please try again.')
       }
     }
@@ -126,86 +200,159 @@ function AIAssistant() {
   }
   
   return (
-    <>
-      <HeroSection 
-        title="AI Farming Assistant"
-        subtitle="Get instant expert advice powered by Google Gemini AI"
-        backgroundClass="bg-gradient-to-r bg-[#DAFCE7] to-blue-50"
-      />
-      
-      {/* AI Tools Section */}
-      <section className="py-12 bg-white">
-        <div className="container-custom">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">AI-Powered Tools</h2>
-            <div className="flex items-center justify-center space-x-2 text-sm text-gray-600">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span>Powered by Google Gemini AI</span>
-            </div>
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`${
+        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      } fixed lg:relative lg:translate-x-0 inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white transition-transform duration-300 flex flex-col`}>
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">AgroTrends AI</h2>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden text-gray-400 hover:text-white"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <button 
+            onClick={clearChat}
+            className="w-full bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span>New Chat</span>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">AI Tools</h3>
+          <div className="space-y-2">
             {aiTools.map(tool => (
-              <div 
+              <button
                 key={tool.id}
                 onClick={() => setSelectedTool(tool.id)}
-                className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-300 ${
-                  selectedTool === tool.id 
-                    ? 'border-primary-500 bg-primary-50 shadow-lg transform scale-105' 
-                    : 'border-gray-200 hover:border-primary-300 hover:shadow-md'
+                className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 ${
+                  selectedTool === tool.id
+                    ? 'bg-gray-800 text-white'
+                    : 'text-gray-300 hover:bg-gray-800'
                 }`}
               >
-                <div className="text-4xl mb-4 text-center">{tool.icon}</div>
-                <h3 className="text-lg font-semibold mb-2 text-center">{tool.name}</h3>
-                <p className="text-gray-600 text-center text-sm">{tool.description}</p>
-              </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">{tool.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{tool.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{tool.description}</p>
+                  </div>
+                </div>
+              </button>
             ))}
           </div>
         </div>
-      </section>
-      
-      {/* AI Chat Interface */}
-      {selectedTool === 'chat' && (
-        <section className="py-12 bg-gray-50">
-          <div className="container-custom">
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-primary-600 to-blue-600 text-white p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-xl font-semibold">AI Farming Assistant</h3>
-                      <p className="text-primary-100">Powered by Google Gemini</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span className="text-sm">Online</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="h-96 overflow-y-auto p-4 space-y-4">
-                  {messages.map(message => (
-                    <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+
+        <div className="p-4 border-t border-gray-700">
+          <div className="flex items-center space-x-2 text-xs text-gray-400">
+            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+            <span>Powered by Google Gemini</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col w-full lg:w-auto overflow-hidden">
+        {/* Header */}
+        <div className="bg-white border-b px-4 lg:px-6 py-3 lg:py-4 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center space-x-2 lg:space-x-4 min-w-0 flex-1">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden text-gray-600 hover:text-gray-900 flex-shrink-0"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base lg:text-lg font-semibold text-gray-900 truncate">
+                {aiTools.find(t => t.id === selectedTool)?.name || 'AI Assistant'}
+              </h1>
+              <p className="text-xs lg:text-sm text-gray-500 truncate hidden sm:block">
+                {aiTools.find(t => t.id === selectedTool)?.description}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <div className="flex items-center space-x-2 px-2 lg:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs lg:text-sm">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="hidden sm:inline">Online</span>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Chat Interface */}
+        {selectedTool === 'chat' && (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-3 lg:px-4 py-4 lg:py-6">
+              <div className="max-w-3xl mx-auto space-y-4 lg:space-y-6">
+                {messages.map(message => (
+                  <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`flex items-start space-x-2 lg:space-x-3 max-w-[85%] lg:max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                      {/* Avatar */}
+                      <div className={`flex-shrink-0 w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-semibold ${
                         message.type === 'user' 
                           ? 'bg-gradient-to-r from-primary-600 to-blue-600 text-white' 
-                          : 'bg-gray-100 text-gray-800 border'
+                          : 'bg-green-600 text-white'
                       }`}>
-                        <p className="whitespace-pre-wrap">{message.content}</p>
-                        <p className={`text-xs mt-1 ${
-                          message.type === 'user' ? 'text-white/70' : 'text-gray-500'
+                        {message.type === 'user' ? 'Y' : 'AI'}
+                      </div>
+                      
+                      {/* Message Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className={`px-3 lg:px-4 py-2 lg:py-3 rounded-2xl ${
+                          message.type === 'user' 
+                            ? 'bg-gradient-to-r from-primary-600 to-blue-600 text-white' 
+                            : 'bg-white border border-gray-200 text-gray-800'
                         }`}>
-                          {message.timestamp}
-                        </p>
+                          <p className="whitespace-pre-wrap text-xs lg:text-sm leading-relaxed break-words">{message.content}</p>
+                        </div>
+                        <div className="flex items-center space-x-2 mt-1 px-2">
+                          <p className="text-xs text-gray-400">{message.timestamp}</p>
+                          {message.type === 'ai' && (
+                            <button
+                              onClick={() => speakText(message.content)}
+                              className="text-gray-400 hover:text-primary-600 transition-colors hidden sm:block"
+                              title="Read aloud"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m0-7.07a5 5 0 00-1.414 1.414M12 12h.01" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ))}
-                  
-                  {isTyping && (
-                    <div className="flex justify-start">
-                      <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg border">
+                  </div>
+                ))}
+                
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="flex items-start space-x-2 lg:space-x-3 max-w-[85%] lg:max-w-[80%]">
+                      <div className="flex-shrink-0 w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-semibold bg-green-600 text-white">
+                        AI
+                      </div>
+                      <div className="bg-white border border-gray-200 px-3 lg:px-4 py-2 lg:py-3 rounded-2xl">
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm">Gemini is thinking</span>
                           <div className="flex space-x-1">
                             <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
                             <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
@@ -214,43 +361,74 @@ function AIAssistant() {
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-                
-                <form onSubmit={handleSendMessage} className="p-4 border-t bg-gray-50">
-                  <div className="flex space-x-2">
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+            
+            {/* Input Area */}
+            <div className="border-t bg-white px-3 lg:px-4 py-3 lg:py-4 flex-shrink-0">
+              <div className="max-w-3xl mx-auto">
+                <form onSubmit={handleSendMessage} className="relative">
+                  <div className="flex items-center space-x-2 bg-white border border-gray-300 rounded-full lg:rounded-3xl px-3 lg:px-4 py-2 lg:py-3 shadow-sm focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-200">
                     <input
                       type="text"
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
-                      placeholder="Ask your farming question..."
-                      className="flex-1 form-input"
+                      placeholder="Message AgroTrends AI..."
+                      className="flex-1 outline-none text-sm lg:text-base text-gray-900 placeholder-gray-400"
                       disabled={isTyping}
                     />
+                    
+                    {/* Voice Input Button */}
+                    <button
+                      type="button"
+                      onClick={toggleVoiceInput}
+                      className={`p-1.5 lg:p-2 rounded-full transition-all flex-shrink-0 ${
+                        isListening 
+                          ? 'bg-red-500 text-white animate-pulse' 
+                          : 'text-gray-400 hover:text-primary-600 hover:bg-gray-100'
+                      }`}
+                      title={isListening ? 'Stop recording' : 'Voice input'}
+                    >
+                      <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                    </button>
+                    
+                    {/* Send Button */}
                     <button 
                       type="submit" 
                       disabled={isTyping || !inputMessage.trim()}
-                      className="bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white px-6 py-2 rounded-md transition-all duration-200 disabled:cursor-not-allowed"
+                      className="bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-700 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 text-white p-1.5 lg:p-2 rounded-full transition-all disabled:cursor-not-allowed flex-shrink-0"
                     >
-                      {isTyping ? 'Thinking...' : 'Send'}
+                      {isTyping ? (
+                        <svg className="animate-spin h-4 w-4 lg:h-5 lg:w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                      )}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    💡 Try: "How do I treat tomato blight?" or "Best fertilizer for corn?"
-                  </p>
                 </form>
+                <p className="text-xs text-gray-500 text-center mt-2 lg:mt-3 hidden sm:block">
+                  AgroTrends AI can make mistakes. Consider checking important information.
+                </p>
               </div>
             </div>
           </div>
-        </section>
-      )}
-      
-      {/* Disease Diagnosis Tool */}
-      {selectedTool === 'disease' && (
-        <section className="py-12 bg-gray-50">
-          <div className="container-custom">
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-lg shadow-lg p-8">
+        )}
+
+          {/* Disease Diagnosis Tool */}
+        {selectedTool === 'disease' && (
+          <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg p-4 lg:p-8">
                 <div className="text-center mb-6">
                   <h3 className="text-2xl font-semibold mb-2">Plant Disease Diagnosis</h3>
                   <div className="flex items-center justify-center space-x-2 text-sm text-gray-600">
@@ -289,15 +467,13 @@ function AIAssistant() {
               </div>
             </div>
           </div>
-        </section>
-      )}
-      
-      {/* Weather Insights Tool */}
-      {selectedTool === 'weather' && (
-        <section className="py-12 bg-gray-50">
-          <div className="container-custom">
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-lg shadow-lg p-8">
+        )}
+
+        {/* Weather Insights Tool */}
+        {selectedTool === 'weather' && (
+          <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg p-4 lg:p-8">
                 <div className="text-center mb-6">
                   <h3 className="text-2xl font-semibold mb-2">AI Weather Insights</h3>
                   <div className="flex items-center justify-center space-x-2 text-sm text-gray-600">
@@ -323,15 +499,13 @@ function AIAssistant() {
               </div>
             </div>
           </div>
-        </section>
-      )}
-      
-      {/* Yield Predictor Tool */}
-      {selectedTool === 'yield' && (
-        <section className="py-12 bg-gray-50">
-          <div className="container-custom">
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-lg shadow-lg p-8">
+        )}
+
+        {/* Yield Predictor Tool */}
+        {selectedTool === 'yield' && (
+          <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg p-4 lg:p-8">
                 <div className="text-center mb-6">
                   <h3 className="text-2xl font-semibold mb-2">Yield Prediction</h3>
                   <div className="flex items-center justify-center space-x-2 text-sm text-gray-600">
@@ -407,9 +581,9 @@ function AIAssistant() {
               </div>
             </div>
           </div>
-        </section>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   )
 }
 
