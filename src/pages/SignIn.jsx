@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 function SignIn() {
+  const { signIn } = useAuth()
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     username: '',
     password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -18,8 +22,15 @@ function SignIn() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    console.log('Signing in with:', formData)
-    // Add API call here
+    setError('')
+    
+    const result = signIn(formData)
+    
+    if (result.success) {
+      navigate('/')
+    } else {
+      setError(result.error || 'Invalid credentials. Please try again.')
+    }
   }
 
   return (
@@ -29,6 +40,12 @@ function SignIn() {
         <h2 className="text-xl font-semibold text-center text-gray-700">Sign In</h2>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-600">Username</label>
             <input

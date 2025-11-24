@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import Logo from './Logo'
+import UserProfile from './UserProfile'
 
 function Navbar() {
+  const { isAuthenticated } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
-  const [showCategories, setShowCategories] = useState(false)
 
   const toggleMenu = () => setIsOpen(!isOpen)
-  const toggleCategories = () => setShowCategories(!showCategories)
 
   const closeMenu = () => {
     setIsOpen(false)
-    setShowCategories(false)
   }
 
   return (
@@ -96,12 +96,20 @@ function Navbar() {
             <NavLink to="/ai-assistant" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
               AI Assistant
             </NavLink>
-            <NavLink to="/sign-up" className="btn-primary ml-4 rounded-2xl">
-              Sign Up
-            </NavLink>
-            <NavLink to="/sign-in" className="btn-secondary  hover:bg-green-600 hover:text-white rounded-2xl">
-              Sign In
-            </NavLink>
+            {isAuthenticated ? (
+              <div className="ml-4">
+                <UserProfile />
+              </div>
+            ) : (
+              <>
+                <NavLink to="/sign-up" className="btn-primary ml-4 rounded-2xl">
+                  Sign Up
+                </NavLink>
+                <NavLink to="/sign-in" className="btn-secondary  hover:bg-green-600 hover:text-white rounded-2xl">
+                  Sign In
+                </NavLink>
+              </>
+            )}
           </div>
         </div>
 
@@ -162,14 +170,20 @@ function Navbar() {
             <NavLink to="/ai-assistant" className="block nav-link py-2" onClick={closeMenu}>
               AI Assistant
             </NavLink>
-            <div className="flex flex-col space-y-2 pt-2">
-              <NavLink to="/sign-up" className="btn-primary text-center py-2 rounded-2xl" onClick={closeMenu}>
-                Sign Up
-              </NavLink>
-              <NavLink to="/sign-in" className="btn-secondary text-center py-2 rounded-2xl  hover:bg-green-600 hover:text-white" onClick={closeMenu}>
-                Sign In
-              </NavLink>
-            </div>
+            {isAuthenticated ? (
+              <div className="pt-2">
+                <UserProfile />
+              </div>
+            ) : (
+              <div className="flex flex-col space-y-2 pt-2">
+                <NavLink to="/sign-up" className="btn-primary text-center py-2 rounded-2xl" onClick={closeMenu}>
+                  Sign Up
+                </NavLink>
+                <NavLink to="/sign-in" className="btn-secondary text-center py-2 rounded-2xl  hover:bg-green-600 hover:text-white" onClick={closeMenu}>
+                  Sign In
+                </NavLink>
+              </div>
+            )}
           </div>
         )}
       </div>

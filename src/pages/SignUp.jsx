@@ -1,7 +1,10 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 function SignUp() {
+  const { signUp } = useAuth()
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -9,6 +12,7 @@ function SignUp() {
     role: 'User'
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -20,8 +24,15 @@ function SignUp() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    console.log('Signing up with:', formData)
-    // Add API call here
+    setError('')
+    
+    const result = signUp(formData)
+    
+    if (result.success) {
+      navigate('/')
+    } else {
+      setError(result.error || 'Failed to sign up. Please try again.')
+    }
   }
 
   return (
@@ -29,6 +40,12 @@ function SignUp() {
       <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg space-y-6">
         <h1 className="text-4xl font-bold text-center text-green-700">AgroTrends</h1>
         <h2 className="text-xl font-semibold text-center text-gray-700">Create an Account</h2>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div>
