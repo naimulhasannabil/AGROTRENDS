@@ -22,9 +22,24 @@ function AIAssistant() {
   })
   const [yieldPrediction, setYieldPrediction] = useState(null)
   const [isListening, setIsListening] = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const messagesEndRef = useRef(null)
   const recognitionRef = useRef(null)
+
+  // Open sidebar by default on desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsSidebarOpen(true)
+      } else {
+        setIsSidebarOpen(false)
+      }
+    }
+    
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
   
   // AI Tools
   const aiTools = [
@@ -200,7 +215,7 @@ function AIAssistant() {
   }
   
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex min-h-screen bg-gray-50">
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
@@ -212,7 +227,7 @@ function AIAssistant() {
       {/* Sidebar */}
       <div className={`${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      } fixed lg:relative lg:translate-x-0 inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white transition-transform duration-300 flex flex-col`}>
+      } fixed lg:sticky lg:top-0 lg:translate-x-0 inset-y-0 left-0 z-50 lg:z-10 w-64 bg-gray-900 text-white transition-transform duration-300 flex flex-col lg:h-screen lg:self-start`}>
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">AgroTrends AI</h2>
@@ -242,7 +257,13 @@ function AIAssistant() {
             {aiTools.map(tool => (
               <button
                 key={tool.id}
-                onClick={() => setSelectedTool(tool.id)}
+                onClick={() => {
+                  setSelectedTool(tool.id)
+                  // Close sidebar on mobile after selecting a tool
+                  if (window.innerWidth < 1024) {
+                    setIsSidebarOpen(false)
+                  }
+                }}
                 className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 ${
                   selectedTool === tool.id
                     ? 'bg-gray-800 text-white'
@@ -270,7 +291,7 @@ function AIAssistant() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col w-full lg:w-auto overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         {/* Header */}
         <div className="bg-white border-b px-4 lg:px-6 py-3 lg:py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center space-x-2 lg:space-x-4 min-w-0 flex-1">
