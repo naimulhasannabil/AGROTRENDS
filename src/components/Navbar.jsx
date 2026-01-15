@@ -93,9 +93,9 @@ function Navbar() {
             <NavLink to="/events" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
               Events
             </NavLink>
-            <NavLink to="/ai-assistant" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
+            <a href="/ai-assistant" target="_blank" rel="noopener noreferrer" className="nav-link">
               AI Assistant
-            </NavLink>
+            </a>
             {isAuthenticated ? (
               <div className="ml-4">
                 <UserProfile />
@@ -167,9 +167,9 @@ function Navbar() {
             <NavLink to="/events" className="block nav-link py-2" onClick={closeMenu}>
               Events
             </NavLink>
-            <NavLink to="/ai-assistant" className="block nav-link py-2" onClick={closeMenu}>
+            <a href="/ai-assistant" target="_blank" rel="noopener noreferrer" className="block nav-link py-2">
               AI Assistant
-            </NavLink>
+            </a>
             {isAuthenticated ? (
               <div className="pt-2">
                 <UserProfile />
