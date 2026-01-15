@@ -63,7 +63,7 @@ function AIChat() {
     setMessages([{
       id: 1,
       type: 'ai',
-      content: '👋 Hi! I\'m your AI farming assistant powered by Google Gemini. How can I help you today?',
+      content: '👋 Hi! I\'m your AI farming assistant powered by AgroTrends. How can I help you today?',
       timestamp: new Date().toLocaleTimeString()
     }])
   }
