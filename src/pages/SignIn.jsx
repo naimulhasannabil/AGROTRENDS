@@ -61,18 +61,18 @@ console.log(`=== ${isAdminMode ? 'ADMIN' : 'USER'} SIGNIN RESPONSE ====`)
       
       if (isAdminMode) {
         // Admin API response structure
-        if (!response.data?.accessToken) {
+        if (!response.data?.payload?.accessToken) {
           console.error('❌ Admin sign-in failed: No access token')
           setError('Admin sign-in failed. Please try again.')
           return
         }
         
-        accessToken = response.data.accessToken
+        accessToken = response.data.payload.accessToken
         userData = {
-          ...response.data.user,
+          ...response.data.payload.user,
           userType: ['SUPER_ADMIN'],
           isAdmin: true,
-          roles: response.data.user?.roles || []
+          roles: response.data.payload.user?.roles || []
         }
         
         console.log('Admin token:', accessToken.substring(0, 20) + '...')
