@@ -1,23 +1,78 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useMe, useUpdateUser } from '../services/query'
 
 function UserProfile() {
-  const { user, logout, updateProfile } = useAuth()
+  const {user,  logout } = useAuth()
+  const {data: me, refetch: refetchUser, isLoading, isRefetching} = useMe();
+  const { mutateAsync: updateProfileMutation } = useUpdateUser();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [profileData, setProfileData] = useState(null)
+  
+  // Debug logging
+  console.log('UserProfile - Current user:', user)
+  console.log('UserProfile - userType:', user?.userType)
+  console.log('UserProfile - Full profile data:', profileData)
+  
+  // Get display name and role from profile data or user object
+  const displayName = me?.name || profileData?.name || user?.name || user?.username || 'User'
+  const displayRole = profileData?.userTypes?.[0] || user?.userType?.[0] || user?.role || 'User'
+  const displayEmail = profileData?.email || user?.email || ''
+  const displayMobile = profileData?.mobileNumber || user?.mobileNumber || ''
+  
+  console.log('UserProfile - displayName:', displayName)
+  console.log('UserProfile - displayRole:', displayRole)
+  
   const [editForm, setEditForm] = useState({
-    username: user?.username || '',
+    name: user?.name || user?.username || '',
     email: user?.email || '',
+    mobileNumber: user?.mobileNumber || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   })
-  const [previewImage, setPreviewImage] = useState(user?.profileImage || null)
+  const [previewImage, setPreviewImage] = useState(user?.profileImageUrl || user?.profileImage || null)
   const [errorMessage, setErrorMessage] = useState('')
   const fileInputRef = useRef(null)
 
-  const handleLogout = () => {
-    logout()
+  // Fetch user profile data when dropdown opens
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (isDropdownOpen && user && !profileData) {
+        try {
+          const response = me;
+          console.log('Fetched profile data:', response)
+          setProfileData(response)
+        } catch (error) {
+          console.error('Failed to fetch profile:', error)
+          // Use fallback to user data from auth context
+        } finally {
+          // Ensure profileData is at least set to user data if API call fails
+        }
+      }
+    }
+    fetchProfile()
+  }, [isDropdownOpen, user, profileData])
+
+  // Update form when profile data or user data changes
+  useEffect(() => {
+    const dataSource = profileData || user
+    if (dataSource) {
+      setEditForm({
+        name: dataSource?.name || dataSource?.username || '',
+        email: dataSource?.email || '',
+        mobileNumber: dataSource?.mobileNumber || '',
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      })
+      setPreviewImage(dataSource?.profileImageUrl || dataSource?.profileImage || null)
+    }
+  }, [profileData, user])
+
+  const handleLogout = async () => {
+    await logout()
     setIsDropdownOpen(false)
   }
 
@@ -44,33 +99,63 @@ function UserProfile() {
     setErrorMessage('')
   }
 
-  const resetEditState = (referenceUser = user) => {
+  const resetEditState = (referenceUser = profileData || user) => {
     setEditForm({
-      username: referenceUser?.username || '',
+      name: referenceUser?.name || referenceUser?.username || '',
       email: referenceUser?.email || '',
+      mobileNumber: referenceUser?.mobileNumber || '',
       currentPassword: '',
       newPassword: '',
       confirmPassword: ''
     })
-    setPreviewImage(referenceUser?.profileImage || null)
+    setPreviewImage(referenceUser?.profileImageUrl || referenceUser?.profileImage || null)
     setErrorMessage('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
   }
 
-  const handleUpdateProfile = (event) => {
+  const handleUpdateProfile = async (event) => {
     event.preventDefault()
     setErrorMessage('')
 
-    const trimmedUsername = editForm.username.trim()
-    const trimmedEmail = editForm.email.trim()
+    const updateData = {
+      userId: me.id
+    }
+    let hasChanges = false
 
-    if (!trimmedUsername || !trimmedEmail) {
-      setErrorMessage('Username and email are required')
-      return
+    // Check and add name if changed
+    const trimmedName = editForm.name.trim()
+    const currentName = user?.name || user?.username || ''
+    if (trimmedName && trimmedName !== currentName) {
+      updateData.name = trimmedName
+      hasChanges = true
     }
 
+    // Check and add email if changed
+    const trimmedEmail = editForm.email.trim()
+    const currentEmail = profileData?.email || user?.email || ''
+    if (trimmedEmail && trimmedEmail !== currentEmail) {
+      updateData.email = trimmedEmail
+      hasChanges = true
+    }
+
+    // Check and add mobile number if changed
+    const trimmedMobile = editForm.mobileNumber.trim()
+    const currentMobile = profileData?.mobileNumber || user?.mobileNumber || ''
+    if (trimmedMobile && trimmedMobile !== currentMobile) {
+      updateData.mobileNumber = trimmedMobile
+      hasChanges = true
+    }
+
+    // Check and add profile image if changed
+    const currentImage = user?.profileImageUrl || user?.profileImage || null
+    if (previewImage !== currentImage) {
+      updateData.profileImageUrl = previewImage
+      hasChanges = true
+    }
+
+    // Handle password update separately
     if (editForm.newPassword) {
       if (editForm.newPassword.length < 6) {
         setErrorMessage('New password must be at least 6 characters long')
@@ -82,35 +167,57 @@ function UserProfile() {
         return
       }
 
-      if (user?.password && editForm.currentPassword !== user.password) {
-        setErrorMessage('Current password is incorrect')
+      if (!editForm.currentPassword) {
+        setErrorMessage('Please enter your current password to change it')
         return
       }
-    } else if (editForm.currentPassword || editForm.confirmPassword) {
+
+      updateData.password = editForm.newPassword
+      updateData.currentPassword = editForm.currentPassword
+  
+      await updateProfileMutation(updateData)
+      hasChanges = true
+    }
+
+    // Check if user filled password fields without new password
+    if (!editForm.newPassword && (editForm.currentPassword || editForm.confirmPassword)) {
       setErrorMessage('Enter a new password to update it')
       return
     }
 
-    const updateData = {
-      username: trimmedUsername,
-      email: trimmedEmail,
-      profileImage: previewImage || null
+    // If no changes detected
+    if (!hasChanges) {
+      setErrorMessage('No changes detected')
+      return
     }
 
-    if (editForm.newPassword) {
-      updateData.password = editForm.newPassword
-    }
-
-    const result = updateProfile(updateData)
-    if (result?.success) {
-      resetEditState(result.user)
-      setIsEditMode(false)
-    } else if (result?.error) {
-      setErrorMessage(result.error)
+    try {
+      console.log('Updating profile with data:', updateData)
+      const result = await updateProfileMutation(updateData)
+      console.log('Update result:', result)
+      
+      if (result?.success) {
+        // Refresh profile data from API
+        refetchUser
+        setProfileData(me)
+        resetEditState(me)
+        setIsEditMode(false)
+        setErrorMessage('')
+      } else if (result?.error) {
+        setErrorMessage(result.error)
+      }
+    } catch (error) {
+      console.error('Profile update error:', error)
+      setErrorMessage(error.response?.data?.message || 'Failed to update profile. Please try again.')
     }
   }
 
-  if (!user) return null
+  if (!user || isLoading || isRefetching) return (
+    <div className="flex items-center space-x-2 bg-primary-50 p-2 rounded-lg">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-600 to-blue-600 animate-pulse"></div>
+      <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+    )
 
   return (
     <div className="relative">
@@ -119,15 +226,15 @@ function UserProfile() {
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="flex items-center space-x-2 bg-primary-50 hover:bg-primary-100 p-2 rounded-lg transition-colors"
       >
-        {user.profileImage ? (
+        {(user.profileImageUrl || user.profileImage) ? (
           <img
-            src={user.profileImage}
+            src={user.profileImageUrl || user.profileImage}
             alt="Profile"
             className="w-8 h-8 rounded-full object-cover"
           />
         ) : (
           <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-600 to-blue-600 flex items-center justify-center text-white font-semibold">
-            {user.username?.charAt(0).toUpperCase() || 'U'}
+            {displayName?.charAt(0).toUpperCase() || 'U'}
           </div>
         )}
         <svg 
@@ -156,41 +263,54 @@ function UserProfile() {
                 {/* Profile Header */}
                 <div className="bg-gradient-to-r from-primary-600 to-blue-600 p-4 text-white">
                   <div className="flex items-center space-x-3">
-                    {user.profileImage ? (
+                    {(user.profileImageUrl || user.profileImage) ? (
                       <img
-                        src={user.profileImage}
+                        src={user.profileImageUrl || user.profileImage}
                         alt="Profile"
                         className="w-12 h-12 rounded-full object-cover border-2 border-white/30"
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xl font-bold">
-                        {user.username?.charAt(0).toUpperCase() || 'U'}
+                        {displayName?.charAt(0).toUpperCase() || 'U'}
                       </div>
                     )}
                     <div>
-                      <h3 className="font-semibold text-lg">{user.username}</h3>
-                      <p className="text-xs text-white/80">{user.email}</p>
+                      <h3 className="font-semibold text-lg">{displayName}</h3>
+                      <p className="text-xs text-white/80">{displayEmail}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Profile Info */}
                 <div className="p-4 space-y-3">
+                 
+                  
                   <div className="flex items-center justify-between py-2 border-b">
-                    <span className="text-sm text-gray-600">Role</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      user.role === 'Admin' 
-                        ? 'bg-purple-100 text-purple-700' 
-                        : 'bg-green-100 text-green-700'
-                    }`}>
-                      {user.role}
+                    <span className="text-sm text-gray-600">Email</span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {displayEmail}
                     </span>
                   </div>
                   
+                  {displayMobile && (
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-sm text-gray-600">Mobile</span>
+                      <span className="text-sm font-medium text-gray-800">
+                        {displayMobile}
+                      </span>
+                    </div>
+                  )}
+                  
+                 
                   <div className="flex items-center justify-between py-2 border-b">
                     <span className="text-sm text-gray-600">Member Since</span>
                     <span className="text-sm font-medium text-gray-800">
-                      {new Date(user.createdAt).toLocaleDateString()}
+                      {profileData?.creationDate 
+                        ? new Date(profileData.creationDate).toLocaleDateString()
+                        : user?.createdAt 
+                        ? new Date(user.createdAt).toLocaleDateString()
+                        : 'N/A'
+                      }
                     </span>
                   </div>
                 </div>
@@ -287,14 +407,14 @@ function UserProfile() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Username
+                      Name
                     </label>
                     <input
                       type="text"
-                      value={editForm.username}
-                      onChange={(event) => setEditForm({ ...editForm, username: event.target.value })}
+                      value={editForm.name}
+                      onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      required
+                      placeholder="Update your name"
                     />
                   </div>
 
@@ -307,7 +427,20 @@ function UserProfile() {
                       value={editForm.email}
                       onChange={(event) => setEditForm({ ...editForm, email: event.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      required
+                      placeholder="Update your email"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Mobile Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={editForm.mobileNumber}
+                      onChange={(event) => setEditForm({ ...editForm, mobileNumber: event.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="Update your mobile number"
                     />
                   </div>
 

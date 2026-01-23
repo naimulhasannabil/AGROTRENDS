@@ -1,11 +1,17 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import HeroSection from '../components/HeroSection'
+import { getAllCategories } from '../services/categoryService'
 
 function Categories() {
-  const categories = [
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
+  
+  // Static fallback categories with enhanced data
+  const staticCategories = [
     {
       id: 'crops',
-      name: 'Crops',
+      categoryName: 'Crops',
       description: 'Comprehensive crop management guides, growing techniques, and seasonal planting information',
       image: 'https://images.pexels.com/photos/326082/pexels-photo-326082.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
       features: ['Crop Database', 'Growing Guides', 'Seasonal Calendar', 'Pest Management'],
@@ -13,7 +19,7 @@ function Categories() {
     },
     {
       id: 'livestock',
-      name: 'Livestock',
+      categoryName: 'Livestock',
       description: 'Expert guidance for raising healthy livestock, breeding programs, and animal welfare',
       image: 'https://images.pexels.com/photos/422218/pexels-photo-422218.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
       features: ['Animal Care', 'Breeding Programs', 'Health Management', 'Nutrition Plans'],
@@ -21,7 +27,7 @@ function Categories() {
     },
     {
       id: 'fisheries',
-      name: 'Fisheries & Aquaculture',
+      categoryName: 'Fisheries & Aquaculture',
       description: 'Sustainable fish farming techniques, water quality management, and aquaculture systems',
       image: 'https://images.pexels.com/photos/1300355/pexels-photo-1300355.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
       features: ['Fish Species', 'Water Management', 'Feeding Programs', 'Disease Prevention'],
@@ -29,13 +35,54 @@ function Categories() {
     },
     {
       id: 'technologies',
-      name: 'Agricultural Technologies',
+      categoryName: 'Agricultural Technologies',
       description: 'Latest farming technologies, precision agriculture tools, and smart farming solutions',
       image: 'https://images.pexels.com/photos/2280551/pexels-photo-2280551.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
       features: ['Smart Farming', 'IoT Solutions', 'Precision Tools', 'Automation'],
       link: '/technologies'
     }
   ]
+
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+  const fetchCategories = async () => {
+    try {
+      setLoading(true)
+      const data = await getAllCategories(0, 50, 'categoryName', 'asc')
+      console.log('Fetched categories:', data)
+      
+      if (Array.isArray(data) && data.length > 0) {
+        // Enrich API data with static data (images, descriptions, features, links)
+        const enrichedCategories = data.map(apiCategory => {
+          const staticMatch = staticCategories.find(
+            cat => cat.categoryName.toLowerCase() === apiCategory.categoryName.toLowerCase()
+          )
+          return {
+            id: apiCategory.id,
+            categoryName: apiCategory.categoryName,
+            creationDate: apiCategory.creationDate,
+            lastModifiedDate: apiCategory.lastModifiedDate,
+            // Use static data for UI elements not in API
+            description: staticMatch?.description || `Explore ${apiCategory.categoryName} resources`,
+            image: staticMatch?.image || 'https://images.pexels.com/photos/974314/pexels-photo-974314.jpeg',
+            features: staticMatch?.features || ['Information', 'Resources', 'Guides', 'Tips'],
+            link: staticMatch?.link || `/categories/${apiCategory.id}`
+          }
+        })
+        setCategories(enrichedCategories)
+      } else {
+        // Use static categories as fallback
+        setCategories(staticCategories)
+      }
+    } catch (error) {
+      console.error('Error loading categories, using fallback:', error)
+      setCategories(staticCategories)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <>
@@ -47,48 +94,54 @@ function Categories() {
       
       <section className="py-16 bg-white">
         <div className="container-custom">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {categories.map(category => (
-              <div key={category.id} className="bg-[#DAFCE7] rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:-translate-y-2 hover:shadow-xl">
-                <div className="relative">
-                  <img 
-                    src={category.image} 
-                    alt={category.name} 
-                    className="w-full h-64 object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  <div className="absolute bottom-4 left-4">
-                    <h3 className="text-2xl font-bold text-white">{category.name}</h3>
-                  </div>
-                </div>
-                
-                <div className="p-6">
-                  <p className="text-gray-600 mb-6">{category.description}</p>
-                  
-                  <div className="mb-6">
-                    <h4 className="font-semibold mb-3">Key Features:</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {category.features.map((feature, index) => (
-                        <div key={index} className="flex items-center text-sm text-gray-600">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {feature}
-                        </div>
-                      ))}
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {categories.map(category => (
+                <div key={category.id} className="bg-[#DAFCE7] rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:-translate-y-2 hover:shadow-xl">
+                  <div className="relative">
+                    <img 
+                      src={category.image} 
+                      alt={category.categoryName} 
+                      className="w-full h-64 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                    <div className="absolute bottom-4 left-4">
+                      <h3 className="text-2xl font-bold text-white">{category.categoryName}</h3>
                     </div>
                   </div>
                   
-                  <Link 
-                    to={category.link}
-                    className="btn-primary w-full text-center"
-                  >
-                    Explore {category.name}
-                  </Link>
+                  <div className="p-6">
+                    <p className="text-gray-600 mb-6">{category.description}</p>
+                    
+                    <div className="mb-6">
+                      <h4 className="font-semibold mb-3">Key Features:</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {category.features.map((feature, index) => (
+                          <div key={index} className="flex items-center text-sm text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {feature}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <Link 
+                      to={category.link}
+                      className="btn-primary w-full text-center"
+                    >
+                      Explore {category.categoryName}
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
       

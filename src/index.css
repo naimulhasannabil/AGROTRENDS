@@ -6,35 +6,40 @@
   html {
     scroll-behavior: smooth;
   }
-  
+
   body {
     @apply font-sans text-gray-800 min-h-screen;
   }
-  
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold;
   }
-  
+
   h1 {
     @apply text-3xl sm:text-4xl md:text-5xl leading-tight;
   }
-  
+
   h2 {
     @apply text-2xl sm:text-3xl md:text-4xl leading-tight;
   }
-  
+
   h3 {
     @apply text-xl sm:text-2xl md:text-3xl leading-snug;
   }
-  
+
   h4 {
     @apply text-lg sm:text-xl md:text-2xl;
   }
-  
+
   h5 {
     @apply text-base sm:text-lg md:text-xl;
   }
-  
+
   h6 {
     @apply text-sm sm:text-base md:text-lg;
   }
@@ -48,27 +53,27 @@
   .btn {
     @apply px-4 py-2 rounded-md font-medium transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 text-center;
   }
-  
+
   .btn-primary {
     @apply btn bg-primary-600 hover:bg-primary-700 text-white focus:ring-primary-500;
   }
-  
+
   .btn-secondary {
     @apply btn bg-white hover:bg-gray-100 text-primary-700 border border-primary-600 focus:ring-primary-500;
   }
-  
+
   .container-custom {
     @apply container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
   }
-  
+
   .nav-link {
     @apply text-gray-700 hover:text-primary-700 transition duration-300;
   }
-  
+
   .nav-link-active {
     @apply text-primary-700 font-medium;
   }
-  
+
   .section {
     @apply py-8 sm:py-12 md:py-16 lg:py-20;
   }
@@ -95,6 +100,22 @@
 
   .form-label {
     @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+
+  /* Animation for notification */
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
   }
 }
 
@@ -159,7 +180,6 @@
 .w-responsive {
   @apply w-full sm:w-auto;
 }
-
 
 /* :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -229,3 +249,66 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 } */
+
+/* Quill Editor Styles */
+.quill-editor-wrapper {
+  @apply border border-gray-300 rounded-md overflow-hidden;
+}
+
+.quill-editor-wrapper .ql-toolbar {
+  @apply bg-gray-50 border-0 border-b border-gray-300;
+}
+
+.quill-editor-wrapper .ql-container {
+  @apply border-0 bg-white;
+  min-height: 300px;
+  font-size: 16px;
+}
+
+.quill-editor-wrapper .ql-editor {
+  min-height: 300px;
+  @apply px-4 py-3;
+}
+
+.quill-editor-wrapper .ql-editor.ql-blank::before {
+  @apply text-gray-400 italic;
+  font-style: normal;
+}
+
+.quill-editor-wrapper .ql-editor:focus {
+  outline: none;
+}
+
+.quill-editor-wrapper:focus-within {
+  @apply ring-2 ring-primary-500;
+}
+
+/* Quill Toolbar Button Styles */
+.ql-toolbar button:hover,
+.ql-toolbar button:focus {
+  @apply text-primary-600;
+}
+
+.ql-toolbar button.ql-active {
+  @apply text-primary-600;
+}
+
+.ql-toolbar .ql-stroke {
+  stroke: currentColor;
+}
+
+.ql-toolbar .ql-fill {
+  fill: currentColor;
+}
+
+.ql-toolbar button:hover .ql-stroke,
+.ql-toolbar button:focus .ql-stroke,
+.ql-toolbar button.ql-active .ql-stroke {
+  stroke: #10b981;
+}
+
+.ql-toolbar button:hover .ql-fill,
+.ql-toolbar button:focus .ql-fill,
+.ql-toolbar button.ql-active .ql-fill {
+  fill: #10b981;
+}

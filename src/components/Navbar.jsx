@@ -3,9 +3,11 @@ import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Logo from './Logo'
 import UserProfile from './UserProfile'
+import { useMe } from '../services/query'
 
 function Navbar() {
   const { isAuthenticated } = useAuth()
+  const {data: me} = useMe()
   const [isOpen, setIsOpen] = useState(false)
 
   const toggleMenu = () => setIsOpen(!isOpen)
@@ -13,7 +15,7 @@ function Navbar() {
   const closeMenu = () => {
     setIsOpen(false)
   }
-
+console.log(me);
   return (
     <nav className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
       <div className="container-custom py-4">
@@ -22,7 +24,6 @@ function Navbar() {
             <Logo className="h-8 w-auto" />
             <span className="ml-2 text-xl font-bold text-primary-600">AgroTrends</span>
           </Link>
-
           {/* Mobile menu button */}
           <button 
             className="md:hidden rounded-md p-2 text-gray-700 hover:text-primary-600 focus:outline-none" 
