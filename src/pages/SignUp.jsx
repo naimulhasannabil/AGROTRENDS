@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { signUp as signUpService } from '../services/authService'
+import ReactCrop from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
+import { notification } from 'antd'
 
 function SignUp() {
   const navigate = useNavigate()
@@ -20,6 +23,16 @@ function SignUp() {
     institution: '',
     professionalStatement: ''
   })
+  
+  // Image upload states
+  const [_selectedImage, setSelectedImage] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
+  const [crop, setCrop] = useState({ unit: '%', width: 100, height: 100, x: 0, y: 0, aspect: 1 })
+  const [completedCrop, setCompletedCrop] = useState(null)
+  const [showCropModal, setShowCropModal] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const imgRef = useRef(null)
+  const fileInputRef = useRef(null)
   
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
@@ -45,6 +58,120 @@ function SignUp() {
       ...prev,
       [name]: value
     }))
+  }
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        setError('Image size must be less than 10MB')
+        return
+      }
+      
+      const reader = new FileReader()
+      reader.onload = () => {
+        setSelectedImage(file)
+        setImagePreview(reader.result)
+        setShowCropModal(true)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const getCroppedImg = async () => {
+    if (!completedCrop || !imgRef.current) return null
+
+    const canvas = document.createElement('canvas')
+    const scaleX = imgRef.current.naturalWidth / imgRef.current.width
+    const scaleY = imgRef.current.naturalHeight / imgRef.current.height
+    canvas.width = completedCrop.width
+    canvas.height = completedCrop.height
+    const ctx = canvas.getContext('2d')
+
+    ctx.drawImage(
+      imgRef.current,
+      completedCrop.x * scaleX,
+      completedCrop.y * scaleY,
+      completedCrop.width * scaleX,
+      completedCrop.height * scaleY,
+      0,
+      0,
+      completedCrop.width,
+      completedCrop.height
+    )
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob)
+      }, 'image/jpeg', 0.9)
+    })
+  }
+
+  const handleUploadImage = async () => {
+    try {
+      setUploading(true)
+      setError('')
+      
+      const croppedBlob = await getCroppedImg()
+      if (!croppedBlob) {
+        setError('Failed to crop image')
+        return
+      }
+
+      // Convert blob to base64
+      const reader = new FileReader()
+      reader.readAsDataURL(croppedBlob)
+      reader.onloadend = async () => {
+        const base64data = reader.result.split(',')[1]
+        
+        // Upload to ImgBB
+        const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY || '3df18933133843953dea4ab8c5859e84'
+        
+        try {
+          const formData = new FormData()
+          formData.append('image', base64data)
+          
+          const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: formData
+          })
+          
+          const result = await response.json()
+          
+          if (result.success) {
+            setProfessionalInfo(prev => ({
+              ...prev,
+              profileImageUrl: result.data.url
+            }))
+            
+            setShowCropModal(false)
+            setSelectedImage(null)
+            setImagePreview(null)
+            notification.success({
+              message: 'Success',
+              description: 'Profile image uploaded successfully!',
+              placement: 'topRight'
+            })
+          } else {
+            setError('Failed to upload image. Please try again.')
+          }
+        } catch (uploadError) {
+          console.error('ImgBB upload error:', uploadError)
+          setError('Failed to upload image. Please try again.')
+        }
+      }
+    } catch (err) {
+      console.error('Error uploading image:', err)
+      setError('Failed to upload image')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setProfessionalInfo(prev => ({ ...prev, profileImageUrl: '' }))
+    setSelectedImage(null)
+    setImagePreview(null)
   }
 
   const handleSubmit = async (e) => {
@@ -253,16 +380,47 @@ function SignUp() {
                 />
               </div>
 
+              {/* Profile Image Upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-600">Profile Image URL</label>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Profile Image</label>
                 <input
-                  name="profileImageUrl"
-                  type="url"
-                  value={professionalInfo.profileImageUrl}
-                  onChange={handleProfessionalInfoChange}
-                  placeholder="https://example.com/profile.jpg"
-                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-400 focus:outline-none"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
                 />
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Upload Image
+                  </button>
+                  
+                  {professionalInfo.profileImageUrl && (
+                    <div className="relative inline-block">
+                      <img 
+                        src={professionalInfo.profileImageUrl} 
+                        alt="Profile preview" 
+                        className="w-32 h-32 object-cover rounded-lg border-2 border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -296,6 +454,65 @@ function SignUp() {
           </Link>
         </p>
       </div>
+
+      {/* Image Crop Modal */}
+      {showCropModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold mb-4">Crop Profile Image</h3>
+              
+              {imagePreview && (
+                <div className="mb-4">
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(c) => setCrop(c)}
+                    onComplete={(c) => setCompletedCrop(c)}
+                    aspect={1}
+                  >
+                    <img
+                      ref={imgRef}
+                      src={imagePreview}
+                      alt="Crop preview"
+                      className="max-w-full h-auto"
+                    />
+                  </ReactCrop>
+                </div>
+              )}
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCropModal(false)
+                    setSelectedImage(null)
+                    setImagePreview(null)
+                    setError('')
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={uploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUploadImage}
+                  disabled={uploading || !completedCrop}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
