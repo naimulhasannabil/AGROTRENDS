@@ -21,7 +21,9 @@ function UserProfile() {
   const displayName = me?.name || profileData?.name || user?.name || user?.username || 'User'
   const displayRole = profileData?.userTypes?.[0] || user?.userType?.[0] || user?.role || 'User'
   const displayEmail = profileData?.email || user?.email || ''
-  const displayMobile = profileData?.mobileNumber || user?.mobileNumber || ''
+  // Fix null mobile display - check if mobileNumber exists and is not null
+  const rawMobile = me?.mobileNumber || profileData?.mobileNumber || user?.mobileNumber
+  const displayMobile = rawMobile && rawMobile !== 'null' ? rawMobile : null
   
   console.log('UserProfile - displayName:', displayName)
   console.log('UserProfile - displayRole:', displayRole)
@@ -158,40 +160,34 @@ function UserProfile() {
 
     console.log('Current user data (me):', me)
     
-    // Backend requires userId, email, and other fields
-    // Always include userId, email as they are required by backend
+    // Backend requires all fields in the API spec, not just changed ones
     const updateData = {
       userId: me.id,
-      email: me.email || user?.email || editForm.email.trim() // Email is required
+      name: editForm.name.trim() || me.name, // Always include name
+      email: editForm.email.trim() || me.email, // Always include email
+      countryCode: me?.countryCode || user?.countryCode || '+880', // Default countryCode
+      mobileNumber: editForm.mobileNumber.trim() || me?.mobileNumber || '' // Always include mobile
     }
     let hasChanges = false
 
-    // Check and add name if changed
+    // Check if name changed
     const trimmedName = editForm.name.trim()
     const currentName = me?.name || user?.name || user?.username || ''
     if (trimmedName && trimmedName !== currentName) {
-      updateData.name = trimmedName
       hasChanges = true
     }
 
-    // Check and add email if changed from current
+    // Check if email changed
     const trimmedEmail = editForm.email.trim()
     const currentEmail = me?.email || profileData?.email || user?.email || ''
     if (trimmedEmail && trimmedEmail !== currentEmail) {
-      updateData.email = trimmedEmail
       hasChanges = true
     }
 
-    // Add countryCode if available (might be required by backend)
-    if (me?.countryCode || user?.countryCode) {
-      updateData.countryCode = me?.countryCode || user?.countryCode
-    }
-
-    // Check and add mobile number if changed
+    // Check if mobile number changed
     const trimmedMobile = editForm.mobileNumber.trim()
     const currentMobile = me?.mobileNumber || profileData?.mobileNumber || user?.mobileNumber || ''
-    if (trimmedMobile && trimmedMobile !== currentMobile) {
-      updateData.mobileNumber = trimmedMobile
+    if (trimmedMobile && trimmedMobile !== currentMobile && trimmedMobile !== 'null') {
       hasChanges = true
     }
 
@@ -356,14 +352,12 @@ function UserProfile() {
                     </span>
                   </div>
                   
-                  {displayMobile && (
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-sm text-gray-600">Mobile</span>
-                      <span className="text-sm font-medium text-gray-800">
-                        {displayMobile}
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-sm text-gray-600">Mobile</span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {displayMobile || 'Not provided'}
+                    </span>
+                  </div>
                   
                  
                   <div className="flex items-center justify-between py-2 border-b">
