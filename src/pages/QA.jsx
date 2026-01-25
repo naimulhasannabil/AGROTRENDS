@@ -3,19 +3,28 @@ import HeroSection from '../components/HeroSection'
 import { useAuth } from '../contexts/AuthContext'
 import { 
   getAllQuestions, 
-  getQuestionsByUserId, 
+  // getQuestionsByUserId, 
   createQuestion, 
   updateQuestion, 
   deleteQuestion,
-  addAnswer,
+  // addAnswer,
   replyToAnswer,
   updateAnswer,
   deleteAnswer,
   getAnswersByQuestionId
 } from '../services/qaService'
+import { useGetUserQuestions } from '../services/query'
+
 
 function QA() {
   const { user } = useAuth()
+  const { data: userQuestionsData, isLoading: isLoadingUserQuestions} = useGetUserQuestions(
+    user?.id,
+    0,
+    50,
+    'creationDate',
+    'desc'
+  )
   const [title, setTitle] = useState('')
   const [question, setQuestion] = useState('')
   const [category, setCategory] = useState('')
@@ -73,7 +82,16 @@ function QA() {
       answersCount: 2
     }
   ]
-
+  
+  // Log user questions data
+  useEffect(() => {
+    if (userQuestionsData) {
+      console.log('User Questions Data:', userQuestionsData)
+      console.log('Payload:', userQuestionsData.payload)
+      console.log('Content:', userQuestionsData.payload?.content)
+    }
+  }, [userQuestionsData])
+  
   useEffect(() => {
     fetchQuestions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,7 +180,7 @@ function QA() {
     }
 
     try {
-      const newAnswer = await addAnswer(questionId, user.id, content)
+      // const newAnswer = await addAnswer(questionId, user.id, content)
       
       // Clear the answer text
       setAnswerText(prev => ({ ...prev, [questionId]: '' }))
@@ -456,6 +474,90 @@ function QA() {
           </div>
         </div>
       </section>
+      )}
+      
+      {/* My Questions - Grid View (Similar to Crops) */}
+      {user && (
+        <section className="py-12 bg-gray-50">
+          <div className="container-custom">
+            <h2 className="text-3xl font-bold text-center mb-12">My Questions</h2>
+            
+            {isLoadingUserQuestions ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+              </div>
+            ) : userQuestionsData?.payload?.content && userQuestionsData.payload.content.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {userQuestionsData.payload.content.map((item) => (
+                    <div key={item.id} className="card">
+                      <div className="card-body">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="text-xl font-semibold">{item.title}</h3>
+                          <span className="bg-primary-100 text-primary-800 text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap">
+                            {formatDate(item.creationDate)}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 mb-4 line-clamp-3">{item.content}</p>
+                        
+                        <div className="space-y-2 text-sm mb-4">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Asked by:</span>
+                            <span className="font-medium">{item.user?.name || 'Unknown'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Email:</span>
+                            <span className="font-medium text-xs">{item.user?.email || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">User Type:</span>
+                            <span className="font-medium">
+                              {item.user?.userTypes?.join(', ') || 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <h4 className="font-medium mb-2">User Roles:</h4>
+                          <div className="flex flex-wrap gap-1">
+                            {item.user?.roles?.map((role, index) => (
+                              <span 
+                                key={index} 
+                                className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"
+                              >
+                                {role.roleName}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <button className="btn-primary w-full" onClick={() => toggleQuestion(item.id)}>
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Pagination Info */}
+                {userQuestionsData?.payload?.totalElements && (
+                  <div className="text-center mt-8 text-gray-600">
+                    <p>
+                      Showing {userQuestionsData.payload.numberOfElements} of {userQuestionsData.payload.totalElements} questions
+                      {userQuestionsData.payload.totalPages > 1 && (
+                        <span> • Page {userQuestionsData.payload.number + 1} of {userQuestionsData.payload.totalPages}</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg">You haven't asked any questions yet.</p>
+              </div>
+            )}
+          </div>
+        </section>
       )}
       
       {/* Info message for AUTHORS */}

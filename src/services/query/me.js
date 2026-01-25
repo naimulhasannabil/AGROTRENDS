@@ -38,3 +38,23 @@ export const useUpdateUser = () => {
     },
   });
 };
+export const useDeleteUser = () => {
+  return useMutation({
+    mutationFn: async (userId) => {
+      const response = await api.delete(`/api/user/delete/${userId}`);
+      return response.data;
+    },
+  });
+};
+
+export const usePaginatedUsers = (page = 1, limit = 10) => {
+  return useQuery({
+    queryKey: ["users", "paginated", page, limit],
+    queryFn: async () => {
+      const { data } = await api.get("/api/user/paginated", {
+        params: { page, limit },
+      });
+      return data.payload;
+    },
+  });
+};
