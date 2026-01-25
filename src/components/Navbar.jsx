@@ -4,14 +4,11 @@ import { useAuth } from '../contexts/AuthContext'
 import Logo from './Logo'
 import UserProfile from './UserProfile'
 import { useMe } from '../services/query'
-import { useTranslation } from 'react-i18next'
-import LanguageSwitcher from './LanguageSwitcher'
 
 function Navbar() {
   const { isAuthenticated } = useAuth()
   const {data: me} = useMe()
   const [isOpen, setIsOpen] = useState(false)
-  const { t } = useTranslation()
 
   const toggleMenu = () => setIsOpen(!isOpen)
 
@@ -44,13 +41,13 @@ console.log(me);
           {/* Desktop navigation */}
           <div className="hidden md:flex md:items-center md:space-x-4 lg:space-x-6">
             <NavLink to="/" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
-              {t('home')}
+              Home
             </NavLink>
             <NavLink to="/about" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
-              {t('about')}
+              About Us
             </NavLink>
             <NavLink to="/blogs" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
-              {t('blogs')}
+              Blogs
             </NavLink>
             {/* <div className="relative">
               <button 
@@ -83,24 +80,23 @@ console.log(me);
               )}
             </div> */}
             <NavLink to="/categories" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
-              {t('categories')}
+              Categories
             </NavLink>
             <NavLink to="/products" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
-              {t('products')}
+              Products
             </NavLink>
             <NavLink to="/courses" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
-              {t('courses')}
+              Courses
             </NavLink>
             <NavLink to="/qa" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
-              {t('qa')}
+              Q&A
             </NavLink>
             <NavLink to="/events" className={({isActive}) => isActive ? "nav-link-active" : "nav-link"}>
-              {t('events')}
+              Events
             </NavLink>
             <a href="/ai-assistant" target="_blank" rel="noopener noreferrer" className="nav-link">
-              {t('aiAssistant')}
+              AI Assistant
             </a>
-            <LanguageSwitcher />
             {isAuthenticated ? (
               <div className="ml-4">
                 <UserProfile />
@@ -108,10 +104,10 @@ console.log(me);
             ) : (
               <>
                 <NavLink to="/sign-up" className="btn-primary ml-4 rounded-2xl">
-                  {t('signUp')}
+                  Sign Up
                 </NavLink>
                 <NavLink to="/sign-in" className="btn-secondary  hover:bg-green-600 hover:text-white rounded-2xl">
-                  {t('signIn')}
+                  Sign In
                 </NavLink>
               </>
             )}
@@ -122,13 +118,13 @@ console.log(me);
         {isOpen && (
           <div className="md:hidden mt-4 pb-2 border-t border-gray-200 pt-4 space-y-2">
             <NavLink to="/" className="block nav-link py-2" onClick={closeMenu}>
-              {t('home')}
+              Home
             </NavLink>
             <NavLink to="/about" className="block nav-link py-2" onClick={closeMenu}>
-              {t('about')}
+              About Us
             </NavLink>
             <NavLink to="/blogs" className="block nav-link py-2" onClick={closeMenu}>
-              {t('blogs')}
+              Blogs
             </NavLink>
             {/* <div>
               <button 
@@ -158,26 +154,23 @@ console.log(me);
               )}
             </div> */}
             <NavLink to="/categories" className="block nav-link py-2" onClick={closeMenu}>
-              {t('categories')}
+              Categories
             </NavLink>
             <NavLink to="/products" className="block nav-link py-2" onClick={closeMenu}>
-              {t('products')}
+              Products
             </NavLink>
             <NavLink to="/courses" className="block nav-link py-2" onClick={closeMenu}>
-              {t('courses')}
+              Courses
             </NavLink>
             <NavLink to="/qa" className="block nav-link py-2" onClick={closeMenu}>
-              {t('qa')}
+              Q&A
             </NavLink>
             <NavLink to="/events" className="block nav-link py-2" onClick={closeMenu}>
-              {t('events')}
+              Events
             </NavLink>
             <a href="/ai-assistant" target="_blank" rel="noopener noreferrer" className="block nav-link py-2">
-              {t('aiAssistant')}
+              AI Assistant
             </a>
-            <div className="pt-4 border-t border-gray-200 mt-2">
-              <LanguageSwitcher />
-            </div>
             {isAuthenticated ? (
               <div className="pt-2">
                 <UserProfile />
@@ -185,10 +178,10 @@ console.log(me);
             ) : (
               <div className="flex flex-col space-y-2 pt-2">
                 <NavLink to="/sign-up" className="btn-primary text-center py-2 rounded-2xl" onClick={closeMenu}>
-                  {t('signUp')}
+                  Sign Up
                 </NavLink>
                 <NavLink to="/sign-in" className="btn-secondary text-center py-2 rounded-2xl  hover:bg-green-600 hover:text-white" onClick={closeMenu}>
-                  {t('signIn')}
+                  Sign In
                 </NavLink>
               </div>
             )}
