@@ -8,7 +8,9 @@ export const useMe = () => {
     queryKey: ["me"],
     queryFn: async () => {
       try {
-        const response = await api.get("/api/user/me");
+        const response = await api.get("/api/user/me", {
+          params: { lang: "en" },
+        });
         return response.data.payload;
       } catch (error) {
         if (error.response?.status === 403) {
@@ -23,7 +25,9 @@ export const useUserById = (userId) => {
   return useQuery({
     queryKey: ["user", userId],
     queryFn: async () => {
-      const { data } = await api.get(`/api/user/id/${userId}`);
+      const { data } = await api.get(`/api/user/id/${userId}`, {
+        params: { lang: "en" },
+      });
       return data.payload;
     },
     enabled: !!userId,
@@ -32,7 +36,9 @@ export const useUserById = (userId) => {
 export const useUpdateUser = () => {
   return useMutation({
     mutationFn: async (userData) => {
-      const response = await api.put("/api/user/update", userData);
+      const response = await api.put("/api/user/update", userData, {
+        params: { lang: "en" },
+      });
       console.log(response.data);
       return response.data;
     },
@@ -40,19 +46,26 @@ export const useUpdateUser = () => {
 };
 export const useDeleteUser = () => {
   return useMutation({
-    mutationFn: async (userId) => {
-      const response = await api.delete(`/api/user/delete/${userId}`);
+    mutationFn: async () => {
+      const response = await api.delete("/api/user/delete", {
+        params: { lang: "en" },
+      });
       return response.data;
     },
   });
 };
 
-export const usePaginatedUsers = (page = 1, limit = 10) => {
+export const usePaginatedUsers = (
+  pageNo = 0,
+  pageSize = 20,
+  sortBy = "createdDate",
+  ascOrDesc = "asc",
+) => {
   return useQuery({
-    queryKey: ["users", "paginated", page, limit],
+    queryKey: ["users", "paginated", pageNo, pageSize, sortBy, ascOrDesc],
     queryFn: async () => {
       const { data } = await api.get("/api/user/paginated", {
-        params: { page, limit },
+        params: { pageNo, pageSize, sortBy, ascOrDesc },
       });
       return data.payload;
     },

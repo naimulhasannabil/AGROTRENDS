@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
+import { notification, Modal } from 'antd'
 import { useAuth } from '../contexts/AuthContext'
-import { useMe, useUpdateUser } from '../services/query'
+import { useMe, useUpdateUser, useDeleteUser } from '../services/query'
 
 function UserProfile() {
-  const {user,  logout } = useAuth()
-  const {data: me, refetch: refetchUser, isLoading, isRefetching} = useMe();
+  const {user, logout } = useAuth()
+  const {data: me, refetch: refetchUser, isLoading, isRefetching } = useMe();
   const { mutateAsync: updateProfileMutation } = useUpdateUser();
+  const { mutateAsync: deleteAccountMutation } = useDeleteUser();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [profileData, setProfileData] = useState(null)
@@ -38,22 +40,11 @@ function UserProfile() {
 
   // Fetch user profile data when dropdown opens
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (isDropdownOpen && user && !profileData) {
-        try {
-          const response = me;
-          console.log('Fetched profile data:', response)
-          setProfileData(response)
-        } catch (error) {
-          console.error('Failed to fetch profile:', error)
-          // Use fallback to user data from auth context
-        } finally {
-          // Ensure profileData is at least set to user data if API call fails
-        }
-      }
+    if (isDropdownOpen && me) {
+      console.log('Fetched profile data:', me)
+      setProfileData(me)
     }
-    fetchProfile()
-  }, [isDropdownOpen, user, profileData])
+  }, [isDropdownOpen, me])
 
   // Update form when profile data or user data changes
   useEffect(() => {
@@ -74,6 +65,40 @@ function UserProfile() {
   const handleLogout = async () => {
     await logout()
     setIsDropdownOpen(false)
+    notification.info({
+      title: 'Logged Out',
+      description: 'You have been successfully logged out.',
+      placement: 'topRight'
+    })
+  }
+
+  const handleDeleteAccount = () => {
+    Modal.confirm({
+      title: 'Delete Account',
+      content: 'Are you sure you want to delete your account? This action cannot be undone.',
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await deleteAccountMutation()
+          notification.success({
+            title: 'Account Deleted',
+            description: 'Your account has been successfully deleted.',
+            placement: 'topRight'
+          })
+          // Logout after successful deletion
+          await logout()
+        } catch (error) {
+          console.error('Delete account error:', error)
+          notification.error({
+            title: 'Delete Failed',
+            description: error.response?.data?.message || 'Failed to delete account. Please try again.',
+            placement: 'topRight'
+          })
+        }
+      }
+    })
   }
 
   const handleImageChange = (event) => {
@@ -119,30 +144,52 @@ function UserProfile() {
     event.preventDefault()
     setErrorMessage('')
 
+    // Validate user data is available
+    if (!me || !me.id) {
+      const errorMsg = 'User data not loaded. Please refresh the page.'
+      setErrorMessage(errorMsg)
+      notification.error({
+        title: 'Update Failed',
+        description: errorMsg,
+        placement: 'topRight'
+      })
+      return
+    }
+
+    console.log('Current user data (me):', me)
+    
+    // Backend requires userId, email, and other fields
+    // Always include userId, email as they are required by backend
     const updateData = {
-      userId: me.id
+      userId: me.id,
+      email: me.email || user?.email || editForm.email.trim() // Email is required
     }
     let hasChanges = false
 
     // Check and add name if changed
     const trimmedName = editForm.name.trim()
-    const currentName = user?.name || user?.username || ''
+    const currentName = me?.name || user?.name || user?.username || ''
     if (trimmedName && trimmedName !== currentName) {
       updateData.name = trimmedName
       hasChanges = true
     }
 
-    // Check and add email if changed
+    // Check and add email if changed from current
     const trimmedEmail = editForm.email.trim()
-    const currentEmail = profileData?.email || user?.email || ''
+    const currentEmail = me?.email || profileData?.email || user?.email || ''
     if (trimmedEmail && trimmedEmail !== currentEmail) {
       updateData.email = trimmedEmail
       hasChanges = true
     }
 
+    // Add countryCode if available (might be required by backend)
+    if (me?.countryCode || user?.countryCode) {
+      updateData.countryCode = me?.countryCode || user?.countryCode
+    }
+
     // Check and add mobile number if changed
     const trimmedMobile = editForm.mobileNumber.trim()
-    const currentMobile = profileData?.mobileNumber || user?.mobileNumber || ''
+    const currentMobile = me?.mobileNumber || profileData?.mobileNumber || user?.mobileNumber || ''
     if (trimmedMobile && trimmedMobile !== currentMobile) {
       updateData.mobileNumber = trimmedMobile
       hasChanges = true
@@ -155,7 +202,7 @@ function UserProfile() {
       hasChanges = true
     }
 
-    // Handle password update separately
+    // Handle password update validation
     if (editForm.newPassword) {
       if (editForm.newPassword.length < 6) {
         setErrorMessage('New password must be at least 6 characters long')
@@ -174,8 +221,6 @@ function UserProfile() {
 
       updateData.password = editForm.newPassword
       updateData.currentPassword = editForm.currentPassword
-  
-      await updateProfileMutation(updateData)
       hasChanges = true
     }
 
@@ -191,6 +236,9 @@ function UserProfile() {
       return
     }
 
+    // Log the update payload for debugging
+    console.log('Update payload being sent:', updateData)
+
     try {
       console.log('Updating profile with data:', updateData)
       const result = await updateProfileMutation(updateData)
@@ -198,17 +246,33 @@ function UserProfile() {
       
       if (result?.success) {
         // Refresh profile data from API
-        refetchUser
-        setProfileData(me)
-        resetEditState(me)
+        const refreshedData = await refetchUser()
+        setProfileData(refreshedData.data)
+        resetEditState(refreshedData.data)
         setIsEditMode(false)
         setErrorMessage('')
+        notification.success({
+          title: 'Profile Updated',
+          description: 'Your profile has been successfully updated.',
+          placement: 'topRight'
+        })
       } else if (result?.error) {
         setErrorMessage(result.error)
+        notification.error({
+          title: 'Update Failed',
+          description: result.error,
+          placement: 'topRight'
+        })
       }
     } catch (error) {
       console.error('Profile update error:', error)
-      setErrorMessage(error.response?.data?.message || 'Failed to update profile. Please try again.')
+      const errorMsg = error.response?.data?.message || 'Failed to update profile. Please try again.'
+      setErrorMessage(errorMsg)
+      notification.error({
+        title: 'Update Failed',
+        description: errorMsg,
+        placement: 'topRight'
+      })
     }
   }
 
@@ -332,12 +396,22 @@ function UserProfile() {
                   
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center space-x-2"
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors flex items-center space-x-2"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                     <span>Logout</span>
+                  </button>
+                  
+                  <button
+                    onClick={handleDeleteAccount}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center space-x-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Delete Account</span>
                   </button>
                 </div>
               </>
