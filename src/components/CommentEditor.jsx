@@ -12,7 +12,8 @@ function CommentEditor({
   showCancel = false,
   autoFocus = false,
   rows = 3,
-  size = 'medium' // 'small', 'medium', 'large'
+  size = 'medium', // 'small', 'medium', 'large'
+  emojiPosition = 'bottom' // 'top' or 'bottom'
 }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const textareaRef = useRef(null)
@@ -138,7 +139,12 @@ function CommentEditor({
 
       {/* Emoji Picker Popup */}
       {showEmojiPicker && (
-        <div ref={emojiPickerRef} className="absolute z-50 mt-2 shadow-lg">
+        <div 
+          ref={emojiPickerRef} 
+          className={`absolute z-50 shadow-lg ${
+            emojiPosition === 'top' ? 'bottom-full mb-2' : 'mt-2'
+          }`}
+        >
           <EmojiPicker
             onEmojiClick={handleEmojiClick}
             width={300}
@@ -167,7 +173,8 @@ CommentEditor.propTypes = {
   showCancel: PropTypes.bool,
   autoFocus: PropTypes.bool,
   rows: PropTypes.number,
-  size: PropTypes.oneOf(['small', 'medium', 'large'])
+  size: PropTypes.oneOf(['small', 'medium', 'large']),
+  emojiPosition: PropTypes.oneOf(['top', 'bottom'])
 }
 
 export default CommentEditor

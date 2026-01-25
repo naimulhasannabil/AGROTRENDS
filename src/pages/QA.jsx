@@ -1,128 +1,78 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
+import ReactQuill from 'react-quill-new'
+import 'react-quill-new/dist/quill.snow.css'
+import { notification, Modal } from 'antd'
 import HeroSection from '../components/HeroSection'
+import CommentEditor from '../components/CommentEditor'
 import { useAuth } from '../contexts/AuthContext'
 import { 
-  getAllQuestions, 
-  // getQuestionsByUserId, 
-  createQuestion, 
-  updateQuestion, 
-  deleteQuestion,
-  // addAnswer,
-  replyToAnswer,
-  updateAnswer,
-  deleteAnswer,
-  getAnswersByQuestionId
-} from '../services/qaService'
-import { useGetUserQuestions } from '../services/query'
+  useGetAllQuestions,
+  useGetUserQuestions,
+  useCreateQuestion,
+  useUpdateQuestion,
+  useDeleteQuestion
+} from '../services/query/queue'
+import {
+  useGetAnswersByQuestion,
+  useCreateAnswer,
+  useReplyToAnswer,
+  useUpdateAnswer,
+  useDeleteAnswer
+} from '../services/query/answer'
 
 
 function QA() {
   const { user } = useAuth()
-  const { data: userQuestionsData, isLoading: isLoadingUserQuestions} = useGetUserQuestions(
+  
+  // React Query hooks
+  const { data: userQuestionsData, isLoading: isLoadingUserQuestions } = useGetUserQuestions(
     user?.id,
     0,
     50,
     'creationDate',
     'desc'
   )
+  
+  const { data: allQuestionsData, isLoading: isLoadingAllQuestions, refetch: refetchQuestions } = useGetAllQuestions(
+    0,
+    50,
+    'creationDate',
+    'desc'
+  )
+  
+  const createQuestionMutation = useCreateQuestion()
+  const updateQuestionMutation = useUpdateQuestion()
+  const deleteQuestionMutation = useDeleteQuestion()
+  
   const [title, setTitle] = useState('')
   const [question, setQuestion] = useState('')
-  const [category, setCategory] = useState('')
-  const [questions, setQuestions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  
-  // Check user role
-  const isAuthor = user?.userType?.includes('AUTHOR')
-  const isConsumer = user?.userType?.includes('CONSUMER')
-  
-  // Default view: AUTHOR sees all questions, CONSUMER sees their own
-  const [viewMode, setViewMode] = useState('all') // Always show all questions by default
   const [editingQuestion, setEditingQuestion] = useState(null)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   
   // Answer states
   const [expandedQuestions, setExpandedQuestions] = useState(new Set())
-  const [questionAnswers, setQuestionAnswers] = useState({}) // { questionId: [answers] }
+  const [currentQuestionId, setCurrentQuestionId] = useState(null)
   const [answerText, setAnswerText] = useState({}) // { questionId: text }
   const [replyText, setReplyText] = useState({}) // { answerId: text }
   const [editingAnswer, setEditingAnswer] = useState(null)
   const [editAnswerContent, setEditAnswerContent] = useState('')
   const [replyingTo, setReplyingTo] = useState(null)
-  const [loadingAnswers, setLoadingAnswers] = useState({})
   
-  // Sample FAQs for fallback
-  const sampleFaqs = [
-    {
-      id: 1,
-      title: "What's the best time to plant wheat?",
-      content: "The optimal time to plant wheat depends on your region. In most temperate climates, winter wheat is planted in fall (September to November) and harvested in summer, while spring wheat is planted in early spring and harvested in late summer.",
-      username: "John D.",
-      createdDate: "2025-05-05T10:00:00Z",
-      answers: [],
-      answersCount: 3
-    },
-    {
-      id: 2,
-      title: "How can I naturally control aphids in my vegetable garden?",
-      content: "Several natural methods can control aphids: introduce beneficial insects like ladybugs, use neem oil spray, create a soap spray with mild liquid soap and water, plant aphid-repelling companions like marigolds, or use a strong water spray to physically remove them from plants.",
-      username: "Sarah W.",
-      createdDate: "2025-04-28T10:00:00Z",
-      answers: [],
-      answersCount: 5
-    },
-    {
-      id: 3,
-      title: "What are the signs of nitrogen deficiency in plants?",
-      content: "Signs of nitrogen deficiency include yellowing of older leaves (chlorosis) starting from the tip and moving along the center, stunted growth, smaller leaves, and reduced yields. The entire plant may appear pale green to yellowish compared to healthy plants.",
-      username: "Michael K.",
-      createdDate: "2025-04-22T10:00:00Z",
-      answers: [],
-      answersCount: 2
-    }
-  ]
+  // React Query mutations for answers
+  const createAnswerMutation = useCreateAnswer()
+  const replyToAnswerMutation = useReplyToAnswer()
+  const updateAnswerMutation = useUpdateAnswer()
+  const deleteAnswerMutation = useDeleteAnswer()
   
-  // Log user questions data
-  useEffect(() => {
-    if (userQuestionsData) {
-      console.log('User Questions Data:', userQuestionsData)
-      console.log('Payload:', userQuestionsData.payload)
-      console.log('Content:', userQuestionsData.payload?.content)
-    }
-  }, [userQuestionsData])
+  // Fetch answers for expanded question
+  const { data: answersData, isLoading: isLoadingAnswers, refetch: refetchAnswers } = useGetAnswersByQuestion(currentQuestionId)
   
-  useEffect(() => {
-    fetchQuestions()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, viewMode])
-
-  const fetchQuestions = async () => {
-    try {
-      setLoading(true)
-      // Always fetch all questions for both AUTHOR and CONSUMER
-      const data = await getAllQuestions(0, 50, 'creationDate', 'desc')
-      
-      console.log('Fetched questions:', data)
-      
-      // Always set questions from API, even if empty
-      // This ensures we show real data, not sample FAQs
-      setQuestions(data)
-      
-      // Only show sample FAQs if API returned empty AND we have no questions yet
-      if (data.length === 0 && questions.length === 0) {
-        setQuestions(sampleFaqs)
-      }
-    } catch (error) {
-      console.error('Error loading questions:', error)
-      // Only use sample data on error if we have no existing questions
-      if (questions.length === 0) {
-        setQuestions(sampleFaqs)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Get questions from React Query
+  const questions = allQuestionsData?.payload?.content || allQuestionsData?.content || []
+  
+  // Check user role
+  const isAuthor = user?.userType?.includes('AUTHOR')
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date'
@@ -130,100 +80,132 @@ function QA() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
   
-  const toggleQuestion = async (questionId) => {
+  const toggleQuestion = (questionId) => {
+    if (!questionId) return
+    
     const newExpanded = new Set(expandedQuestions)
     
     if (newExpanded.has(questionId)) {
       newExpanded.delete(questionId)
+      if (currentQuestionId === questionId) {
+        setCurrentQuestionId(null)
+      }
     } else {
       newExpanded.add(questionId)
-      // Fetch answers if not already loaded
-      if (!questionAnswers[questionId]) {
-        await fetchAnswers(questionId)
-      }
+      setCurrentQuestionId(questionId)
     }
     
     setExpandedQuestions(newExpanded)
   }
 
-  const fetchAnswers = async (questionId) => {
-    try {
-      setLoadingAnswers(prev => ({ ...prev, [questionId]: true }))
-      const data = await getAnswersByQuestionId(questionId)
-      
-      // Service already normalizes and handles pagination
-      setQuestionAnswers(prev => ({ ...prev, [questionId]: data }))
-    } catch (error) {
-      console.error('Error fetching answers:', error)
-      setQuestionAnswers(prev => ({ ...prev, [questionId]: [] }))
-    } finally {
-      setLoadingAnswers(prev => ({ ...prev, [questionId]: false }))
-    }
-  }
 
-  const handleAddAnswer = async (questionId) => {
+
+  const handleAddAnswer = (questionId) => {
     if (!user) {
-      alert('Please sign in to answer')
+      notification.warning({
+        title: 'Authentication Required',
+        description: 'Please sign in to answer questions',
+        placement: 'topRight'
+      })
       return
     }
 
     // Only AUTHORS can answer questions
     if (!isAuthor) {
-      alert('Only authors (experts) can answer questions. You can reply to existing answers.')
+      notification.info({
+        title: 'Authors Only',
+        description: 'Only authors (experts) can answer questions. You can reply to existing answers.',
+        placement: 'topRight',
+        duration: 5
+      })
       return
     }
 
     const content = answerText[questionId]?.trim()
     if (!content) {
-      alert('Please enter an answer')
+      notification.warning({
+        title: 'Empty Answer',
+        description: 'Please enter an answer',
+        placement: 'topRight'
+      })
       return
     }
 
-    try {
-      // const newAnswer = await addAnswer(questionId, user.id, content)
-      
-      // Clear the answer text
-      setAnswerText(prev => ({ ...prev, [questionId]: '' }))
-      
-      // Refresh answers from server to get complete data
-      await fetchAnswers(questionId)
-      
-      // Update answer count in questions list
-      setQuestions(questions.map(q => {
-        const qId = q.id || q.questionId
-        return qId === questionId ? { ...q, answersCount: (q.answersCount || 0) + 1 } : q
-      }))
-      
-      alert('Answer added successfully!')
-    } catch (error) {
-      console.error('Error adding answer:', error)
-      alert('Failed to add answer. Please try again.')
+    const answerData = {
+      questionId: questionId,
+      userId: user.id,
+      content: content
     }
+
+    createAnswerMutation.mutate(answerData, {
+      onSuccess: () => {
+        setAnswerText(prev => ({ ...prev, [questionId]: '' }))
+        refetchAnswers()
+        refetchQuestions()
+        notification.success({
+          title: 'Answer Posted',
+          description: 'Your expert answer has been added successfully!',
+          placement: 'topRight'
+        })
+      },
+      onError: (error) => {
+        console.error('Error adding answer:', error)
+        notification.error({
+          title: 'Failed to Post Answer',
+          description: 'Failed to add answer. Please try again.',
+          placement: 'topRight'
+        })
+      }
+    })
   }
 
-  const handleReplyToAnswer = async (questionId, parentAnswerId) => {
+  const handleReplyToAnswer = (questionId, parentAnswerId) => {
     if (!user) {
-      alert('Please sign in to reply')
+      notification.warning({
+        title: 'Authentication Required',
+        description: 'Please sign in to reply',
+        placement: 'topRight'
+      })
       return
     }
 
     const content = replyText[parentAnswerId]?.trim()
     if (!content) {
-      alert('Please enter a reply')
+      notification.warning({
+        title: 'Empty Reply',
+        description: 'Please enter a reply',
+        placement: 'topRight'
+      })
       return
     }
 
-    try {
-      await replyToAnswer(questionId, user.id, parentAnswerId, content)
-      // Refresh answers to show the new reply
-      await fetchAnswers(questionId)
-      setReplyText(prev => ({ ...prev, [parentAnswerId]: '' }))
-      setReplyingTo(null)
-      alert('Reply added successfully!')
-    } catch (error) {
-      console.error('Error adding reply:', error)
-      alert('Failed to add reply. Please try again.')
+    const replyData = {
+      questionId: questionId,
+      userId: user.id,
+      parentAnswerId: parentAnswerId,
+      content: content  // Try 'content' instead of 'answerContent'
     }
+
+    replyToAnswerMutation.mutate(replyData, {
+      onSuccess: () => {
+        setReplyText(prev => ({ ...prev, [parentAnswerId]: '' }))
+        setReplyingTo(null)
+        refetchAnswers()
+        notification.success({
+          title: 'Reply Posted',
+          description: 'Your reply has been added successfully!',
+          placement: 'topRight'
+        })
+      },
+      onError: (error) => {
+        console.error('Error adding reply:', error)
+        notification.error({
+          title: 'Failed to Post Reply',
+          description: 'Failed to add reply. Please try again.',
+          placement: 'topRight'
+        })
+      }
+    })
   }
 
   const handleEditAnswer = (answer) => {
@@ -231,49 +213,92 @@ function QA() {
     setEditAnswerContent(answer.answerContent || answer.content)
   }
 
-  const handleUpdateAnswer = async (questionId, answerId) => {
+  const handleUpdateAnswer = (questionId, answerId) => {
     if (!user) {
-      alert('Please sign in to update')
+      notification.warning({
+        title: 'Authentication Required',
+        description: 'Please sign in to update',
+        placement: 'topRight'
+      })
       return
     }
 
-    try {
-      await updateAnswer(answerId, editAnswerContent)
-      await fetchAnswers(questionId)
-      setEditingAnswer(null)
-      setEditAnswerContent('')
-      alert('Answer updated successfully!')
-    } catch (error) {
-      console.error('Error updating answer:', error)
-      alert('Failed to update answer. Please try again.')
+    const updateData = {
+      answerId: answerId,
+      content: editAnswerContent  // Try 'content' instead of 'answerContent'
     }
+
+    updateAnswerMutation.mutate(updateData, {
+      onSuccess: () => {
+        setEditingAnswer(null)
+        setEditAnswerContent('')
+        refetchAnswers()
+        notification.success({
+          title: 'Answer Updated',
+          description: 'Your answer has been updated successfully!',
+          placement: 'topRight'
+        })
+      },
+      onError: (error) => {
+        console.error('Error updating answer:', error)
+        notification.error({
+          title: 'Update Failed',
+          description: 'Failed to update answer. Please try again.',
+          placement: 'topRight'
+        })
+      }
+    })
   }
 
-  const handleDeleteAnswer = async (questionId, answerId) => {
+  const handleDeleteAnswer = (questionId, answerId) => {
     if (!user) {
-      alert('Please sign in to delete')
+      notification.warning({
+        title: 'Authentication Required',
+        description: 'Please sign in to delete',
+        placement: 'topRight'
+      })
       return
     }
 
-    if (!confirm('Are you sure you want to delete this answer?')) {
+    // Check if we have a valid answer ID from backend
+    if (!answerId || answerId.toString().startsWith('temp-')) {
+      notification.error({
+        title: 'Cannot Delete Answer',
+        description: 'Backend API error: Answer ID is missing. Please contact the administrator to fix the /api/answers/question endpoint to include the answer ID field.',
+        placement: 'topRight',
+        duration: 8
+      })
       return
     }
 
-    try {
-      await deleteAnswer(answerId)
-      await fetchAnswers(questionId)
-      
-      // Update answer count in questions list
-      setQuestions(questions.map(q => {
-        const qId = q.id || q.questionId
-        return qId === questionId ? { ...q, answersCount: Math.max((q.answersCount || 1) - 1, 0) } : q
-      }))
-      
-      alert('Answer deleted successfully!')
-    } catch (error) {
-      console.error('Error deleting answer:', error)
-      alert('Failed to delete answer. Please try again.')
-    }
+    Modal.confirm({
+      title: 'Delete Answer',
+      content: 'Are you sure you want to delete this answer?',
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: () => {
+        deleteAnswerMutation.mutate(answerId, {
+          onSuccess: () => {
+            refetchAnswers()
+            refetchQuestions()
+            notification.success({
+              title: 'Answer Deleted',
+              description: 'Answer has been deleted successfully!',
+              placement: 'topRight'
+            })
+          },
+          onError: (error) => {
+            console.error('Error deleting answer:', error)
+            notification.error({
+              title: 'Deletion Failed',
+              description: 'Failed to delete answer. Please try again.',
+              placement: 'topRight'
+            })
+          }
+        })
+      }
+    })
   }
 
   const handleEdit = (q) => {
@@ -290,57 +315,78 @@ function QA() {
 
   const handleUpdate = async (questionId) => {
     if (!user) {
-      alert('Please sign in to update a question')
+      notification.warning({
+        title: 'Authentication Required',
+        description: 'Please sign in to update a question',
+        placement: 'topRight'
+      })
       return
     }
 
-    try {
-      const questionData = {
-        questionId: questionId,
-        title: editTitle,
-        content: editContent
-      }
-      
-      const updatedQuestion = await updateQuestion(questionData)
-      console.log('Question updated:', updatedQuestion)
-      
-      // Update the question in the list
-      setQuestions(questions.map(q => 
-        (q.id === questionId || q.questionId === questionId) ? updatedQuestion : q
-      ))
-      
-      handleCancelEdit()
-      alert('Question updated successfully!')
-    } catch (error) {
-      console.error('Error updating question:', error)
-      alert('Failed to update question. Please try again.')
+    const questionData = {
+      questionId: questionId,
+      title: editTitle,
+      content: editContent
     }
+    
+    updateQuestionMutation.mutate(questionData, {
+      onSuccess: () => {
+        handleCancelEdit()
+        refetchQuestions()
+        notification.success({
+          title: 'Question Updated',
+          description: 'Your question has been updated successfully!',
+          placement: 'topRight'
+        })
+      },
+      onError: (error) => {
+        console.error('Error updating question:', error)
+        notification.error({
+          title: 'Update Failed',
+          description: 'Failed to update question. Please try again.',
+          placement: 'topRight'
+        })
+      }
+    })
   }
 
   const handleDelete = async (questionId) => {
     if (!user) {
-      alert('Please sign in to delete a question')
+      notification.warning({
+        title: 'Authentication Required',
+        description: 'Please sign in to delete a question',
+        placement: 'topRight'
+      })
       return
     }
 
-    if (!confirm('Are you sure you want to delete this question?')) {
-      return
-    }
-
-    try {
-      await deleteQuestion(questionId)
-      console.log('Question deleted:', questionId)
-      
-      // Remove the question from the list
-      setQuestions(questions.filter(q => 
-        q.id !== questionId && q.questionId !== questionId
-      ))
-      
-      alert('Question deleted successfully!')
-    } catch (error) {
-      console.error('Error deleting question:', error)
-      alert('Failed to delete question. Please try again.')
-    }
+    Modal.confirm({
+      title: 'Delete Question',
+      content: 'Are you sure you want to delete this question?',
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: () => {
+        deleteQuestionMutation.mutate(questionId, {
+          onSuccess: () => {
+            refetchQuestions()
+            notification.success({
+              title: 'Question Deleted',
+              description: 'Question has been deleted successfully!',
+              placement: 'topRight'
+            })
+          },
+          onError: (error) => {
+            console.error('Error deleting question:', error)
+            notification.error({
+              title: 'Deletion Failed',
+              description: 'Failed to delete question. Please try again.',
+              placement: 'topRight'
+            })
+          }
+        })
+      }
+    })
   }
 
   const handleSubmit = async (e) => {
@@ -351,52 +397,60 @@ function QA() {
       return
     }
     
-    // Only CONSUMER users can create questions
-    if (!isConsumer) {
-      alert('Only users (consumers) can ask questions. Authors can answer questions.')
-      return
+    const questionData = {
+      title: title.trim(),
+      content: question.trim()
     }
     
-    try {
-      setSubmitting(true)
-      const questionData = {
-        userId: user.id,
-        title: title,
-        content: question
+    createQuestionMutation.mutate(questionData, {
+      onSuccess: () => {
+        // Reset form
+        setTitle('')
+        setQuestion('')
+        
+        refetchQuestions()
+        notification.success({
+          title: 'Question Posted',
+          description: 'Your question has been submitted successfully!',
+          placement: 'topRight'
+        })
+      },
+      onError: (error) => {
+        console.error('Error submitting question:', error)
+        notification.error({
+          title: 'Submission Failed',
+          description: 'Failed to submit question. Please try again.',
+          placement: 'topRight'
+        })
       }
-      
-      const newQuestion = await createQuestion(questionData)
-      console.log('Question created:', newQuestion)
-      
-      // Reset form
-      setTitle('')
-      setQuestion('')
-      setCategory('')
-      
-      alert('Question submitted successfully!')
-      
-      // Add a small delay to ensure backend has committed the data
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // Refresh the questions list to get updated data from server
-      await fetchQuestions()
-    } catch (error) {
-      console.error('Error submitting question:', error)
-      alert('Failed to submit question. Please try again.')
-    } finally {
-      setSubmitting(false)
-    }
+    })
   }
   
-  // FAQ categories
-  const categories = [
-    "Crops", 
-    "Livestock", 
-    "Soil Management", 
-    "Pest Control", 
-    "Irrigation", 
-    "Farm Equipment", 
-    "Organic Farming"
+  // Quill editor modules - same as BlogForm
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        [{ 'indent': '-1'}, { 'indent': '+1' }],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'align': [] }],
+        ['link', 'image', 'video'],
+        ['clean'],
+        ['blockquote', 'code-block']
+      ]
+    }
+  }), [])
+
+  const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'list', 'indent',
+    'color', 'background',
+    'align',
+    'link', 'image', 'video',
+    'blockquote', 'code-block'
   ]
   
   return (
@@ -408,73 +462,88 @@ function QA() {
         backgroundClass="bg-[#DAFCE7]"
       />
       
-      {/* Ask Question Section - Only for CONSUMER users */}
-      {isConsumer && (
-        <section className="py-12 bg-white">
-          <div className="container-custom max-w-4xl">
-            <div className="bg-[#DAFCE7] rounded-lg p-6 md:p-8">
-              <h2 className="text-2xl font-semibold mb-6">Ask a Question</h2>
+      {/* Ask Question Section - Only for logged-in users */}
+      <section className="py-12 bg-white">
+        <div className="container-custom max-w-4xl">
+          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 md:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-semibold text-gray-800">Ask question</h2>
+              <span className="text-sm text-gray-500">Required fields <span className="text-red-500">*</span></span>
+            </div>
+            
+            {!user ? (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <div className="flex items-center">
+                  <svg className="h-5 w-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-yellow-800 font-medium">Please sign in to ask a question</p>
+                </div>
+              </div>
+            ) : (
               <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-                  Question Title
-                </label>
-                <input
-                  type="text"
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Enter your question title"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
-                </label>
-                <select
-  id="category"
-  value={category}
-  onChange={(e) => setCategory(e.target.value)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
-  required
->
-  <option value="">Select a category</option>
-  {categories.map((cat) => (
-    <option key={cat} value={cat}>{cat}</option>
-  ))}
-</select>
-              </div>
-              <div className="mb-4">
-                <label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-1">
-                  Your Question
-                </label>
-                <textarea
-                  id="question"
-                  rows="4"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  placeholder="Type your farming question here..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  required
-                ></textarea>
-              </div>
-              <button
-                type="submit"
-                disabled={submitting || !user}
-                className="btn-primary rounded-3xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? 'Submitting...' : 'Submit Question'}
-              </button>
-              {!user && (
-                <p className="text-sm text-red-600 mt-2">Please sign in to ask a question</p>
-              )}
-            </form>
+                {/* Title */}
+                <div className="mb-6">
+                  <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter your question title"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    required
+                  />
+                </div>
+
+                {/* Content */}
+                <div className="mb-6">
+                  <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+                    Content *
+                  </label>
+                  <div className="quill-editor-wrapper">
+                    <ReactQuill
+                      theme="snow"
+                      value={question}
+                      onChange={setQuestion}
+                      modules={modules}
+                      formats={formats}
+                      placeholder="Write your blog content here..."
+                      className="bg-white"
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    {question.replace(/<[^>]*>/g, '').length} characters
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTitle('')
+                      setQuestion('')
+                    }}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createQuestionMutation.isPending}
+                    className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {createQuestionMutation.isPending ? 'Saving...' : 'Post Question'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </section>
-      )}
       
       {/* My Questions - Grid View (Similar to Crops) */}
       {user && (
@@ -489,8 +558,8 @@ function QA() {
             ) : userQuestionsData?.payload?.content && userQuestionsData.payload.content.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {userQuestionsData.payload.content.map((item) => (
-                    <div key={item.id} className="card">
+                  {userQuestionsData.payload.content.map((item, index) => (
+                    <div key={item.id || `question-${index}`} className="card">
                       <div className="card-body">
                         <div className="flex justify-between items-start mb-2">
                           <h3 className="text-xl font-semibold">{item.title}</h3>
@@ -498,7 +567,10 @@ function QA() {
                             {formatDate(item.creationDate)}
                           </span>
                         </div>
-                        <p className="text-gray-700 mb-4 line-clamp-3">{item.content}</p>
+                        <div 
+                          className="text-gray-700 mb-4 line-clamp-3"
+                          dangerouslySetInnerHTML={{ __html: item.content }}
+                        />
                         
                         <div className="space-y-2 text-sm mb-4">
                           <div className="flex justify-between">
@@ -520,9 +592,9 @@ function QA() {
                         <div className="mb-4">
                           <h4 className="font-medium mb-2">User Roles:</h4>
                           <div className="flex flex-wrap gap-1">
-                            {item.user?.roles?.map((role, index) => (
+                            {item.user?.roles?.map((role) => (
                               <span 
-                                key={index} 
+                                key={role.roleId || role.id || role.roleName} 
                                 className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"
                               >
                                 {role.roleName}
@@ -560,26 +632,12 @@ function QA() {
         </section>
       )}
       
-      {/* Info message for AUTHORS */}
-      {isAuthor && (
-        <section className="py-8 bg-blue-50">
-          <div className="container-custom max-w-4xl">
-            <div className="bg-white rounded-lg p-6 border-l-4 border-blue-500">
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">👨‍🏫 Author Mode</h3>
-              <p className="text-blue-700">You can view all community questions and provide expert answers. Expand any question below to add your answer.</p>
-            </div>
-          </div>
-        </section>
-      )}
-      
       {/* Questions Section */}
       <section className="py-12 bg-gray-50">
         <div className="container-custom">
-          <h2 className="text-3xl font-bold text-center mb-12">
-            {isAuthor ? 'Community Questions - Answer as Expert' : 'Community Questions'}
-          </h2>
+          <h2 className="text-3xl font-bold text-center mb-12">Community Questions</h2>
           
-          {loading ? (
+          {isLoadingAllQuestions ? (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             </div>
@@ -590,7 +648,13 @@ function QA() {
                 const isOwner = user && (q.userId === user.id)
                 const isEditing = editingQuestion === questionId
                 const isExpanded = expandedQuestions.has(questionId)
-                const answers = questionAnswers[questionId] || []
+                
+                // Safely parse answers data - ensure it's always an array
+                let answers = []
+                if (currentQuestionId === questionId && answersData) {
+                  const data = answersData?.payload || answersData?.content || answersData
+                  answers = Array.isArray(data) ? data : []
+                }
                 
                 return (
                   <div key={questionId} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -599,35 +663,43 @@ function QA() {
                         // Edit Mode
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
                             <input
                               type="text"
                               value={editTitle}
                               onChange={(e) => setEditTitle(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-                            <textarea
-                              rows="4"
-                              value={editContent}
-                              onChange={(e) => setEditContent(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            />
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Content *</label>
+                            <div className="quill-editor-wrapper">
+                              <ReactQuill
+                                theme="snow"
+                                value={editContent}
+                                onChange={setEditContent}
+                                modules={modules}
+                                formats={formats}
+                                placeholder="Write your question content here..."
+                                className="bg-white"
+                              />
+                            </div>
+                            <p className="mt-2 text-sm text-gray-500">
+                              {editContent.replace(/<[^>]*>/g, '').length} characters
+                            </p>
                           </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleUpdate(questionId)}
-                              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-                            >
-                              Save
-                            </button>
+                          <div className="flex justify-end space-x-4">
                             <button
                               onClick={handleCancelEdit}
-                              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+                              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
                             >
                               Cancel
+                            </button>
+                            <button
+                              onClick={() => handleUpdate(questionId)}
+                              className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Save
                             </button>
                           </div>
                         </div>
@@ -677,7 +749,10 @@ function QA() {
                               </button>
                             </div>
                           </div>
-                          <p className="text-gray-700 mb-4">{q.content}</p>
+                          <div 
+                            className="text-gray-700 mb-4"
+                            dangerouslySetInnerHTML={{ __html: q.content }}
+                          />
                           <div className="flex items-center justify-between text-sm text-gray-500">
                             <span>Asked by {q.username || 'Unknown User'}</span>
                             <span>{formatDate(q.createdDate)}</span>
@@ -695,19 +770,15 @@ function QA() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               ✍️ Your Expert Answer
                             </label>
-                            <textarea
-                              rows="3"
+                            <CommentEditor
                               value={answerText[questionId] || ''}
                               onChange={(e) => setAnswerText({ ...answerText, [questionId]: e.target.value })}
+                              onSubmit={() => handleAddAnswer(questionId)}
                               placeholder="Share your expert knowledge..."
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
+                              submitLabel="Post Expert Answer"
+                              rows={3}
+                              size="medium"
                             />
-                            <button
-                              onClick={() => handleAddAnswer(questionId)}
-                              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm"
-                            >
-                              Post Expert Answer
-                            </button>
                           </div>
                         ) : user ? (
                           <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
@@ -723,15 +794,17 @@ function QA() {
                         <div className="space-y-4">
                           <h4 className="font-semibold text-gray-800">{answers.length} {answers.length === 1 ? 'Answer' : 'Answers'}</h4>
                           
-                          {loadingAnswers[questionId] ? (
+                          {(currentQuestionId === questionId && isLoadingAnswers) ? (
                             <div className="flex justify-center py-8">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                             </div>
-                          ) : answers.length === 0 ? (
+                          ) : !Array.isArray(answers) || answers.length === 0 ? (
                             <p className="text-gray-500 text-center py-8">No answers yet. Be the first to answer!</p>
                           ) : (
-                            answers.map((answer) => {
-                              const answerId = answer.answerId || answer.id
+                            Array.isArray(answers) && answers.map((answer, index) => {
+                              // BACKEND ISSUE: API doesn't return answer ID
+                              // Using index as temporary key until backend is fixed
+                              const answerId = answer.id || answer.answerId || `temp-${index}`
                               const isAnswerOwner = user && (answer.userId === user.id)
                               const isEditingAnswer = editingAnswer === answerId
                               const isReplyingToThis = replyingTo === answerId
@@ -803,20 +876,21 @@ function QA() {
                                       
                                       {/* Reply Form */}
                                       {isReplyingToThis && (
-                                        <div className="mt-3 pl-4 border-l-2 border-primary-200">
-                                          <textarea
-                                            rows="2"
-                                            value={replyText[answerId] || ''}
-                                            onChange={(e) => setReplyText({ ...replyText, [answerId]: e.target.value })}
-                                            placeholder="Write your reply..."
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm mb-2"
-                                          />
-                                          <button
-                                            onClick={() => handleReplyToAnswer(questionId, answerId)}
-                                            className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
-                                          >
-                                            Post Reply
-                                          </button>
+                                        <div className="mt-3 pl-4 border-l-2 border-primary-200 relative">
+                                          <div className="relative z-10">
+                                            <CommentEditor
+                                              value={replyText[answerId] || ''}
+                                              onChange={(e) => setReplyText({ ...replyText, [answerId]: e.target.value })}
+                                              onSubmit={() => handleReplyToAnswer(questionId, answerId)}
+                                              onCancel={() => setReplyingTo(null)}
+                                              placeholder="Write your reply..."
+                                              submitLabel="Post Reply"
+                                              showCancel={true}
+                                              rows={2}
+                                              size="small"
+                                              emojiPosition="top"
+                                            />
+                                          </div>
                                         </div>
                                       )}
                                     </>
@@ -834,40 +908,12 @@ function QA() {
             </div>
           )}
           
-          {!loading && questions.length === 0 && (
+          {!isLoadingAllQuestions && questions.length === 0 && (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">No questions yet. Be the first to ask!</p>
             </div>
           )}
         </div>
-      </section>
-      
-      {/* Popular Topics Section */}
-      <section className="py-12 bg-white">
-        <div className="container-custom">
-          <h2 className="text-2xl font-bold text-center mb-8">Popular Topics</h2>
-          <div className="flex flex-wrap justify-center gap-3">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                className="px-4 py-2 bg-gray-100 hover:bg-primary-100 text-gray-700 hover:text-primary-700 rounded-full transition-colors"
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-          
-          {viewMode === 'user' && user && (
-            <div className="text-center mt-10">
-              <button 
-                onClick={() => setViewMode('all')}
-                className="btn-secondary rounded-3xl hover:bg-green-600 hover:text-white"
-              >
-                View All Community Questions
-              </button>
-            </div>
-          )}
       </section>
       
       {/* Community Stats Section */}

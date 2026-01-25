@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import Layout from './layouts/Layout'
 import Home from './pages/Home'
 import About from './pages/About'
@@ -17,13 +17,9 @@ import Products from './pages/Products'
 import Courses from './pages/Courses'
 import QA from './pages/QA'
 import Events from './pages/Events'
-import AIChat from './components/AIChat'
 import AuthDebug from './pages/AuthDebug'
 
 function App() {
-  const location = useLocation()
-  const hideAIChat = location.pathname === '/ai-assistant'
-
   return (
     <>
       <Routes>
@@ -50,7 +46,6 @@ function App() {
         {/* AI Assistant - Full Screen without Layout */}
         <Route path="ai-assistant" element={<AIAssistant />} />
       </Routes>
-      {!hideAIChat && <AIChat />}
     </>
   )
 }

@@ -4,7 +4,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 export const useGetQuestion = (questionId) => {
   return useQuery({
     queryKey: ["question", questionId],
-    queryFn: () => api.get(`/api/questions/id/${questionId}`),
+    queryFn: async () => {
+      const response = await api.get(`/api/questions/id/${questionId}`);
+      return response.data;
+    },
     enabled: !!questionId,
   });
 };
@@ -13,15 +16,17 @@ export const useGetQuestion = (questionId) => {
 export const useGetAllQuestions = (
   pageNo = 0,
   pageSize = 20,
-  sortBy = "createdDate",
+  sortBy = "creationDate",
   ascOrDesc = "asc",
 ) => {
   return useQuery({
     queryKey: ["questions", "all", pageNo, pageSize, sortBy, ascOrDesc],
-    queryFn: () =>
-      api.get(
+    queryFn: async () => {
+      const response = await api.get(
         `/api/questions/all?pageNo=${pageNo}&pageSize=${pageSize}&sortBy=${sortBy}&ascOrDesc=${ascOrDesc}`,
-      ),
+      );
+      return response.data;
+    },
   });
 };
 
@@ -30,7 +35,7 @@ export const useGetUserQuestions = (
   userId,
   pageNo = 0,
   pageSize = 20,
-  sortBy = "createdDate",
+  sortBy = "creationDate",
   ascOrDesc = "asc",
 ) => {
   return useQuery({
@@ -43,10 +48,12 @@ export const useGetUserQuestions = (
       sortBy,
       ascOrDesc,
     ],
-    queryFn: () =>
-      api.get(
+    queryFn: async () => {
+      const response = await api.get(
         `/api/questions/all/user/${userId}?pageNo=${pageNo}&pageSize=${pageSize}&sortBy=${sortBy}&ascOrDesc=${ascOrDesc}`,
-      ),
+      );
+      return response.data;
+    },
     enabled: !!userId,
   });
 };
@@ -54,8 +61,12 @@ export const useGetUserQuestions = (
 // Create new question
 export const useCreateQuestion = () => {
   return useMutation({
-    mutationFn: (questionData) =>
-      api.post("/api/questions/create", questionData),
+    mutationFn: (questionData) => {
+      if (!questionData) {
+        throw new Error("Question data is required");
+      }
+      return api.post("/api/questions/create", questionData);
+    },
   });
 };
 
@@ -70,7 +81,11 @@ export const useUpdateQuestion = () => {
 // Delete question
 export const useDeleteQuestion = () => {
   return useMutation({
-    mutationFn: (questionId) =>
-      api.delete(`/api/questions/id/${questionId}/delete`),
+    mutationFn: (questionId) => {
+      if (!questionId) {
+        throw new Error("Question ID is required");
+      }
+      return api.delete(`/api/questions/id/${questionId}/delete`);
+    },
   });
 };
