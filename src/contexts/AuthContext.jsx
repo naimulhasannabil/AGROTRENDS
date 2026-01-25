@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { signOut as signOutService, updateProfile as updateProfileService } from '../services/authService'
+import { useQueryClient } from '@tanstack/react-query'
 
 const AuthContext = createContext()
 
@@ -16,6 +17,7 @@ const useAuth = () => {
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -57,6 +59,9 @@ function AuthProvider({ children }) {
       setUser(null)
       localStorage.removeItem('agrotrends_user')
       localStorage.removeItem('token')
+      // Clear React Query cache to remove all cached user data
+      queryClient.clear()
+      console.log('User logged out and cache cleared')
     }
   }
 

@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { signIn as signInService, adminSignIn } from '../services/authService'
+import { useQueryClient } from '@tanstack/react-query'
 
 function SignIn() {
   const { setUserData } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const [formData, setFormData] = useState({
     email: location.state?.email || '',
     password: ''
@@ -55,7 +57,9 @@ console.log(`=== ${isAdminMode ? 'ADMIN' : 'USER'} SIGNIN RESPONSE ====`)
       // Clear old data first
       localStorage.removeItem('token')
       localStorage.removeItem('agrotrends_user')
-      console.log('Old auth data cleared')
+      // Clear React Query cache to remove old user data
+      queryClient.clear()
+      console.log('Old auth data and cache cleared')
       
       let accessToken, userData
       
