@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import HeroSection from '../components/HeroSection'
 
 function Livestock() {
@@ -107,8 +108,21 @@ function Livestock() {
         subtitle="Expert guidance for raising healthy and productive livestock"
         backgroundClass="bg-[#DAFCE7]"
       />
-      
-      {/* Search and Filters */}
+            {/* Back Button */}
+      <section className="py-4 bg-gray-50">
+        <div className="container-custom">
+          <Link 
+            to="/categories" 
+            className="inline-flex items-center text-green-600 hover:text-green-700 font-medium transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Categories
+          </Link>
+        </div>
+      </section>
+            {/* Search and Filters */}
       <section className="py-8 bg-white">
         <div className="container-custom">
           <div className="max-w-4xl mx-auto">

@@ -13,7 +13,7 @@ export const useDeleteCategory = () => {
 export const useGetAllCategories = (
   pageNo = 0,
   pageSize = 20,
-  sortBy = "createdDate",
+  sortBy = "creationDate",
   ascOrDesc = "asc",
 ) => {
   return useQuery({
