@@ -148,7 +148,7 @@ function SignUp() {
             setSelectedImage(null)
             setImagePreview(null)
             notification.success({
-              message: 'Success',
+              title: 'Success',
               description: 'Profile image uploaded successfully!',
               placement: 'topRight'
             })

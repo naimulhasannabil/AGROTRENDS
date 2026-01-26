@@ -141,7 +141,38 @@ export const getBlogsByAuthor = async (
 export const getBlogById = async (blogId) => {
   try {
     const response = await API.get(`/api/blogs/id/${blogId}`);
-    return response.data;
+    console.log("Get blog by ID response:", response.data);
+
+    // Extract the blog from payload if it exists
+    const rawBlog =
+      response.data?.payload || response.data?.data || response.data;
+
+    // Normalize the response data
+    if (rawBlog && typeof rawBlog === "object") {
+      const normalizedBlog = {
+        ...rawBlog,
+        blogId: rawBlog.id,
+        // Extract author info from nested structure
+        authorName:
+          rawBlog.author?.user?.name || rawBlog.authorName || "Unknown Author",
+        authorUserId: rawBlog.author?.user?.id || rawBlog.authorUserId,
+        authorEmail: rawBlog.author?.user?.email,
+        authorDesignation: rawBlog.author?.designation,
+        authorOccupation: rawBlog.author?.occupation,
+        authorWorkplace: rawBlog.author?.workPlaceOrInstitution,
+        // Extract category info
+        categoryName: rawBlog.category?.categoryName || rawBlog.categoryName,
+        categoryId: rawBlog.category?.id || rawBlog.categoryId,
+        // Use creationDate from API
+        createdDate: rawBlog.creationDate || rawBlog.createdDate,
+        lastModifiedDate: rawBlog.lastModifiedDate,
+        // Comments
+        comments: rawBlog.comments || [],
+      };
+      return normalizedBlog;
+    }
+
+    return rawBlog;
   } catch (error) {
     console.error("Error fetching blog:", error);
     throw error;
@@ -284,9 +315,12 @@ export const getCommentsByBlogId = async (blogId) => {
     const response = await API.get(`/api/comments/blog/${blogId}`);
     console.log("Get comments by blog ID response:", response.data);
 
+    // Extract the comments array from the payload
+    const commentsData = response.data?.payload || response.data;
+
     // Normalize the response data
-    if (Array.isArray(response.data)) {
-      const normalizedComments = response.data.map((comment) => ({
+    if (Array.isArray(commentsData)) {
+      const normalizedComments = commentsData.map((comment) => ({
         ...comment,
         commentId: comment.id,
         content: comment.commentContent,
@@ -305,7 +339,7 @@ export const getCommentsByBlogId = async (blogId) => {
       return normalizedComments;
     }
 
-    return response.data || [];
+    return [];
   } catch (error) {
     console.error("Error fetching comments by blog ID:", error);
     // Return empty array on error instead of throwing

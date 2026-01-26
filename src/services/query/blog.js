@@ -12,10 +12,19 @@ export const useGetBlog = (blogId, options) => {
 };
 
 // Get all blogs (paginated)
-export const useGetAllBlogs = (page = 1, limit = 10, options) => {
+export const useGetAllBlogs = (
+  pageNo = 0,
+  pageSize = 20,
+  sortBy = "creationDate",
+  ascOrDesc = "asc",
+  options,
+) => {
   return useQuery({
-    queryKey: ["blogs", "all", page, limit],
-    queryFn: () => api.get(`/api/blogs/all?page=${page}&limit=${limit}`),
+    queryKey: ["blogs", "all", pageNo, pageSize, sortBy, ascOrDesc],
+    queryFn: () =>
+      api.get(
+        `/api/blogs/all?pageNo=${pageNo}&pageSize=${pageSize}&sortBy=${sortBy}&ascOrDesc=${ascOrDesc}`,
+      ),
     ...options,
   });
 };
@@ -23,15 +32,25 @@ export const useGetAllBlogs = (page = 1, limit = 10, options) => {
 // Get blogs by category (paginated)
 export const useGetBlogsByCategory = (
   categoryId,
-  page = 1,
-  limit = 10,
+  pageNo = 0,
+  pageSize = 20,
+  sortBy = "creationDate",
+  ascOrDesc = "asc",
   options,
 ) => {
   return useQuery({
-    queryKey: ["blogs", "category", categoryId, page, limit],
+    queryKey: [
+      "blogs",
+      "category",
+      categoryId,
+      pageNo,
+      pageSize,
+      sortBy,
+      ascOrDesc,
+    ],
     queryFn: () =>
       api.get(
-        `/api/blogs/all/category/${categoryId}?page=${page}&limit=${limit}`,
+        `/api/blogs/all/category/${categoryId}?pageNo=${pageNo}&pageSize=${pageSize}&sortBy=${sortBy}&ascOrDesc=${ascOrDesc}`,
       ),
     enabled: !!categoryId,
     ...options,
@@ -41,14 +60,26 @@ export const useGetBlogsByCategory = (
 // Get blogs by author (paginated)
 export const useGetBlogsByAuthor = (
   authorId,
-  page = 1,
-  limit = 10,
+  pageNo = 0,
+  pageSize = 20,
+  sortBy = "creationDate",
+  ascOrDesc = "asc",
   options,
 ) => {
   return useQuery({
-    queryKey: ["blogs", "author", authorId, page, limit],
+    queryKey: [
+      "blogs",
+      "author",
+      authorId,
+      pageNo,
+      pageSize,
+      sortBy,
+      ascOrDesc,
+    ],
     queryFn: () =>
-      api.get(`/api/blogs/all/author/${authorId}?page=${page}&limit=${limit}`),
+      api.get(
+        `/api/blogs/all/author/${authorId}?pageNo=${pageNo}&pageSize=${pageSize}&sortBy=${sortBy}&ascOrDesc=${ascOrDesc}`,
+      ),
     enabled: !!authorId,
     ...options,
   });

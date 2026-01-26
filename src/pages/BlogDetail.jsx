@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import CommentEditor from '../components/CommentEditor'
+import { useGetBlog, useDeleteBlog } from '../services/query/blog'
+import { useQueryClient } from '@tanstack/react-query'
 import { 
-  getBlogById, 
-  deleteBlog, 
   getCommentsByBlogId, 
   addComment, 
   updateComment, 
@@ -18,9 +18,27 @@ function BlogDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [blog, setBlog] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const queryClient = useQueryClient()
+  
+  // Use React Query hooks
+  const { data: blogData, isLoading, error: blogError } = useGetBlog(id)
+  const deleteBlogMutation = useDeleteBlog({
+    onSuccess: () => {
+      setShowDeleteModal(false)
+      // Invalidate all blog queries to refresh the list
+      queryClient.invalidateQueries(['blogs'])
+      queryClient.invalidateQueries(['blog'])
+      alert('Blog deleted successfully!')
+      navigate('/blogs')
+    },
+    onError: (err) => {
+      console.error('Error deleting blog:', err)
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete blog. Please try again.'
+      alert(errorMessage)
+      setShowDeleteModal(false)
+    }
+  })
+  
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
   const [replyTo, setReplyTo] = useState(null) // Format: { commentId, replyId } or { commentId }
@@ -33,6 +51,31 @@ function BlogDetail() {
   const [newCommentsCount, setNewCommentsCount] = useState(0)
   const [showNotification, setShowNotification] = useState(false)
   
+  // Normalize blog data with useMemo to prevent dependency issues
+  const blog = useMemo(() => {
+    if (!blogData?.data) return null;
+    
+    // Handle different API response structures
+    const rawBlog = blogData.data?.payload || blogData.data?.data || blogData.data;
+    
+    if (!rawBlog) return null;
+    
+    return {
+      ...rawBlog,
+      blogId: rawBlog.id,
+      authorName: rawBlog.author?.user?.name || rawBlog.authorName || 'Unknown Author',
+      authorUserId: rawBlog.author?.user?.id || rawBlog.authorUserId,
+      authorEmail: rawBlog.author?.user?.email,
+      authorDesignation: rawBlog.author?.designation,
+      authorOccupation: rawBlog.author?.occupation,
+      authorWorkplace: rawBlog.author?.workPlaceOrInstitution,
+      categoryName: rawBlog.category?.categoryName || rawBlog.categoryName,
+      categoryId: rawBlog.category?.id || rawBlog.categoryId,
+      createdDate: rawBlog.creationDate || rawBlog.createdDate || (rawBlog.creationDateTimeStamp ? new Date(rawBlog.creationDateTimeStamp).toISOString() : null),
+      lastModifiedDate: rawBlog.lastModifiedDate || (rawBlog.lastModifiedDateTimeStamp ? new Date(rawBlog.lastModifiedDateTimeStamp).toISOString() : null)
+    }
+  }, [blogData])
+  
   // Check if user is an author (userType array includes 'AUTHOR')
   const isAuthor = user?.userType?.includes('AUTHOR')
   // Check if current user is the blog author - handle both API structures
@@ -42,12 +85,20 @@ function BlogDetail() {
     blog.author?.id === user.id
   )
 
-  useEffect(() => {
-    fetchBlog()
-    fetchComments()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchComments = useCallback(async () => {
+    try {
+      const data = await getCommentsByBlogId(id)
+      setComments(data)
+    } catch (err) {
+      console.error('Error fetching comments:', err)
+      // Don't show error, just keep empty comments
+    }
   }, [id])
 
+  useEffect(() => {
+    fetchComments()
+  }, [id, fetchComments])
+  
   // Poll for new comments to show notification (for authors)
   useEffect(() => {
     if (!blog || !user || !isBlogAuthor) return
@@ -68,83 +119,31 @@ function BlogDetail() {
     }, 10000) // Check every 10 seconds
     
     return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blog, user, comments.length, id, isBlogAuthor])
-
-  const fetchBlog = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const data = await getBlogById(id)
-      console.log('Blog API response:', data)
-      
-      // Normalize the blog data to handle the comprehensive API structure
-      const normalizedBlog = {
-        ...data,
-        blogId: data.id,
-        // Extract author info from nested structure
-        authorName: data.author?.user?.name || data.authorName || 'Unknown Author',
-        authorUserId: data.author?.user?.id || data.authorUserId,
-        authorEmail: data.author?.user?.email,
-        authorDesignation: data.author?.designation,
-        authorOccupation: data.author?.occupation,
-        authorWorkplace: data.author?.workPlaceOrInstitution,
-        // Extract category info
-        categoryName: data.category?.categoryName || data.categoryName,
-        categoryId: data.category?.id || data.categoryId,
-        // Use creationDate from API
-        createdDate: data.creationDate || data.createdDate,
-        lastModifiedDate: data.lastModifiedDate
-      }
-      
-      console.log('Normalized blog data:', normalizedBlog)
-      setBlog(normalizedBlog)
-      
-      // Handle comments if they come with the blog response
-      if (data.comments && Array.isArray(data.comments)) {
-        const normalizedComments = data.comments.map(comment => ({
-          commentId: comment.id,
-          content: comment.commentContent,
-          userId: comment.user?.id,
-          username: comment.user?.name,
-          userEmail: comment.user?.email,
-          createdDate: comment.creationDate,
-          replies: comment.replies || [],
-          parentCommentId: comment.parentComment
-        }))
-        setComments(normalizedComments)
-      }
-    } catch (err) {
-      console.error('Error fetching blog:', err)
-      setError('Failed to load blog. Please try again later.')
-    } finally {
-      setLoading(false)
+  
+  // Handle comments from blog response
+  useEffect(() => {
+    if (blogData?.data?.comments && Array.isArray(blogData.data.comments)) {
+      const normalizedComments = blogData.data.comments.map(comment => ({
+        commentId: comment.id,
+        content: comment.commentContent,
+        userId: comment.user?.id,
+        username: comment.user?.name,
+        userEmail: comment.user?.email,
+        createdDate: comment.creationDate,
+        replies: comment.replies || [],
+        parentCommentId: comment.parentComment
+      }))
+      setComments(normalizedComments)
     }
-  }
+  }, [blogData])
 
-  const fetchComments = async () => {
-    try {
-      const data = await getCommentsByBlogId(id)
-      setComments(data)
-    } catch (err) {
-      console.error('Error fetching comments:', err)
-      // Don't show error, just keep empty comments
-    }
-  }
-
+  
   const handleDeleteBlog = async () => {
     try {
-      const result = await deleteBlog(id)
-      console.log('Blog deleted successfully:', result)
-      setShowDeleteModal(false)
-      // Show success message before navigating
-      alert(result.message || 'Blog deleted successfully!')
-      navigate('/blogs')
+      deleteBlogMutation.mutate(id)
     } catch (err) {
       console.error('Error deleting blog:', err)
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete blog. Please try again.'
-      alert(errorMessage)
-      setShowDeleteModal(false)
     }
   }
 
@@ -312,7 +311,7 @@ function BlogDetail() {
   console.log('BlogDetail - isAuthor:', isAuthor)
   console.log('BlogDetail - isBlogAuthor:', isBlogAuthor)
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -323,7 +322,46 @@ function BlogDetail() {
     )
   }
 
-  if (error || !blog) {
+  // Check if user is logged in - require login to view blog details
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto p-8 bg-white rounded-lg shadow-lg">
+          <div className="text-primary-600 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <h3 className="text-2xl font-bold text-gray-800 mb-3">Sign In Required</h3>
+            <p className="text-gray-600 mb-6">Please sign in to view full blog details and interact with the content.</p>
+          </div>
+          <div className="flex flex-col space-y-3">
+            <Link 
+              to="/sign-in"
+              state={{ from: `/blogs/${id}` }}
+              className="btn-primary py-3 px-6 text-lg inline-block text-center"
+            >
+              Sign In
+            </Link>
+            <Link 
+              to="/sign-up"
+              state={{ from: `/blogs/${id}` }}
+              className="text-primary-600 hover:text-primary-800 font-medium"
+            >
+              Don't have an account? Sign Up
+            </Link>
+            <Link 
+              to="/blogs" 
+              className="text-gray-500 hover:text-gray-700 text-sm"
+            >
+              ← Back to Blogs
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (blogError || !blog) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -331,7 +369,7 @@ function BlogDetail() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h3 className="text-xl font-medium mb-2">{error || 'Blog not found'}</h3>
+            <h3 className="text-xl font-medium mb-2">{blogError?.message || 'Blog not found'}</h3>
           </div>
           <Link to="/blogs" className="btn-primary">
             Back to Blogs
@@ -409,16 +447,16 @@ function BlogDetail() {
               <div className="flex items-center space-x-4">
                 <div>
                   <p className="text-gray-600">
-                    By <span className="font-semibold">{blog.authorName || 'Unknown Author'}</span>
+                    By <span className="font-semibold">{blog.authorName}</span>
                   </p>
-                  {blog.authorDesignation && (
+                  {blog.authorDesignation && blog.authorDesignation !== 'string' && (
                     <p className="text-sm text-gray-500">{blog.authorDesignation}</p>
                   )}
-                  {blog.authorWorkplace && (
+                  {blog.authorWorkplace && blog.authorWorkplace !== 'string' && (
                     <p className="text-sm text-gray-500">{blog.authorWorkplace}</p>
                   )}
-                  <p className="text-sm text-gray-500">{formatDate(blog.createdDate || blog.creationDate)}</p>
-                  {blog.lastModifiedDate && blog.lastModifiedDate !== blog.creationDate && (
+                  <p className="text-sm text-gray-500">{formatDate(blog.createdDate)}</p>
+                  {blog.lastModifiedDate && blog.lastModifiedDate !== blog.createdDate && (
                     <p className="text-xs text-gray-400">Updated: {formatDate(blog.lastModifiedDate)}</p>
                   )}
                 </div>
@@ -445,9 +483,10 @@ function BlogDetail() {
 
             {/* Blog Content */}
             <div className="prose max-w-none">
-              <p className="text-lg leading-relaxed text-gray-700 whitespace-pre-wrap">
-                {blog.content}
-              </p>
+              <div 
+                className="text-lg leading-relaxed text-gray-700"
+                dangerouslySetInnerHTML={{ __html: blog.content }}
+              />
             </div>
           </div>
 

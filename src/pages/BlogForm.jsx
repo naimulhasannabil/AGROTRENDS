@@ -1,20 +1,62 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { createBlog, updateBlog, getBlogById } from '../services/blogService'
+import { getBlogById } from '../services/blogService'
 import { getAllCategories } from '../services/categoryService'
 import ReactCrop from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
 import { notification } from 'antd'
-import { useCreateBlog } from '../services/query/blog'
+import { useCreateBlog, useUpdateBlog } from '../services/query/blog'
+import { useQueryClient } from '@tanstack/react-query'
 
 function BlogForm() {
-  const {mutate: createBlogMutation}=useCreateBlog()
-  const { id } = useParams() // For editing
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { user } = useAuth()
+  
+  const { mutate: createBlogMutation } = useCreateBlog({
+    onSuccess: () => {
+      // Invalidate and refetch blogs queries
+      queryClient.invalidateQueries({ queryKey: ['blogs'] })
+      notification.success({
+        title: 'Success',
+        description: 'Blog created successfully!',
+        placement: 'topRight'
+      })
+      navigate('/blogs')
+    },
+    onError: (error) => {
+      console.error('Error creating blog:', error)
+      console.error('Error response:', error.response?.data)
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create blog. Please try again.'
+      setError(errorMsg)
+      setLoading(false)
+    }
+  })
+  
+  const { mutate: updateBlogMutation } = useUpdateBlog({
+    onSuccess: () => {
+      // Invalidate and refetch blogs queries
+      queryClient.invalidateQueries({ queryKey: ['blogs'] })
+      notification.success({
+        title: 'Success',
+        description: 'Blog updated successfully!',
+        placement: 'topRight'
+      })
+      navigate('/blogs')
+    },
+    onError: (error) => {
+      console.error('Error updating blog:', error)
+      console.error('Error response:', error.response?.data)
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to update blog. Please try again.'
+      setError(errorMsg)
+      setLoading(false)
+    }
+  })
+  
+  const { id } = useParams() // For editing
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [categories, setCategories] = useState([])
@@ -26,7 +68,7 @@ function BlogForm() {
   })
   
   // Image upload states
-  const [selectedImage, setSelectedImage] = useState(null)
+  const [_selectedImage, setSelectedImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [crop, setCrop] = useState({ unit: '%', width: 100, height: 60, x: 0, y: 0, aspect: 1 })
   const [completedCrop, setCompletedCrop] = useState(null)
@@ -113,10 +155,13 @@ function BlogForm() {
       setLoading(true)
       const data = await getBlogById(id)
       
+      // Extract author ID from nested structure
+      const blogAuthorId = data.author?.user?.id || data.authorUserId || data.author?.id
+      
       // Check if user is the author of this blog
-      if (data.authorUserId !== user.id) {
+      if (blogAuthorId !== user.id) {
         notification.error({
-          message: 'Unauthorized',
+          title: 'Unauthorized',
           description: 'You can only edit your own blogs',
           placement: 'topRight'
         })
@@ -124,11 +169,14 @@ function BlogForm() {
         return
       }
       
+      // Extract category ID from nested structure
+      const categoryId = data.category?.id || data.categoryId
+      
       setFormData({
         title: data.title || '',
         content: data.content || '',
         imageUrl: data.imageUrl || '',
-        categoryId: data.categoryId || ''
+        categoryId: categoryId || ''
       })
     } catch (err) {
       console.error('Error fetching blog:', err)
@@ -235,7 +283,7 @@ function BlogForm() {
             setSelectedImage(null)
             setImagePreview(null)
             notification.success({
-              message: 'Success',
+              title: 'Success',
               description: 'Image uploaded successfully!',
               placement: 'topRight'
             })
@@ -272,6 +320,10 @@ function BlogForm() {
       setError('Title is required')
       return
     }
+    if (formData.title.length > 255) {
+      setError('Title must be less than 255 characters')
+      return
+    }
     if (!formData.content.trim()) {
       setError('Content is required')
       return
@@ -280,62 +332,39 @@ function BlogForm() {
       setError('Please select a category')
       return
     }
+    if (formData.imageUrl && formData.imageUrl.length > 255) {
+      setError('Image URL is too long. Please use a shorter URL.')
+      return
+    }
 
-    try {
-      setLoading(true)
-      setError(null)
+    setLoading(true)
+    setError(null)
 
-      if (id) {
-        // Update existing blog
-        const updateData = {
-          blogId: id,
-          title: formData.title,
-          content: formData.content,
-          imageUrl: formData.imageUrl,
-          categoryId: parseInt(formData.categoryId)
-        }
-        await updateBlog(updateData)
-        notification.success({
-          message: 'Success',
-          description: 'Blog updated successfully!',
-          placement: 'topRight'
-        })
-      } else {
-        // Create new blog
-        const createData = {
-          authorUserId: user.id,
-          categoryId: parseInt(formData.categoryId),
-          title: formData.title,
-          content: formData.content,
-          imageUrl: formData.imageUrl
-        }
-        
-        createBlogMutation(createData, {
-          onSuccess: () => {
-            notification.success({
-              message: 'Success',
-              description: 'Blog created successfully!',
-              placement: 'topRight'
-            })
-            navigate('/blogs')
-          },
-          onError: (error) => {
-            console.error('Error creating blog:', error)
-            setError(error.response?.data?.message || 'Failed to create blog. Please try again.')
-          },
-          onSettled: () => {
-            setLoading(false)
-          }
-        })
-        return
+    if (id) {
+      // Update existing blog
+      const updateData = {
+        blogId: id,
+        title: formData.title.trim(),
+        content: formData.content,
+        imageUrl: formData.imageUrl?.trim() || '',
+        categoryId: parseInt(formData.categoryId)
+      }
+      console.log('Updating blog with data:', updateData)
+      console.log('Field lengths - title:', updateData.title.length, 'imageUrl:', updateData.imageUrl.length)
+      updateBlogMutation(updateData)
+    } else {
+      // Create new blog
+      const createData = {
+        authorUserId: user.id,
+        categoryId: parseInt(formData.categoryId),
+        title: formData.title.trim(),
+        content: formData.content,
+        imageUrl: formData.imageUrl?.trim() || ''
       }
       
-      navigate('/blogs')
-    } catch (err) {
-      console.error('Error saving blog:', err)
-      setError(err.response?.data?.message || 'Failed to save blog. Please try again.')
-    } finally {
-      setLoading(false)
+      console.log('Creating blog with data:', createData)
+      console.log('Field lengths - title:', createData.title.length, 'imageUrl:', createData.imageUrl.length, 'content:', createData.content.length)
+      createBlogMutation(createData)
     }
   }
 
@@ -375,9 +404,14 @@ function BlogForm() {
           <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-8">
             {/* Title */}
             <div className="mb-6">
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                Title *
-              </label>
+              <div className="flex justify-between items-center mb-2">
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                  Title *
+                </label>
+                <span className={`text-xs ${formData.title.length > 255 ? 'text-red-600' : 'text-gray-500'}`}>
+                  {formData.title.length}/255
+                </span>
+              </div>
               <input
                 type="text"
                 id="title"
@@ -385,6 +419,7 @@ function BlogForm() {
                 value={formData.title}
                 onChange={handleChange}
                 placeholder="Enter blog title"
+                maxLength={255}
                 className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
               />
@@ -469,14 +504,28 @@ function BlogForm() {
 
                 {/* Manual URL Input */}
                 <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-gray-600">Or paste image URL</span>
+                    {formData.imageUrl && (
+                      <span className={`text-xs ${formData.imageUrl.length > 255 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                        {formData.imageUrl.length}/255
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="url"
                     name="imageUrl"
                     value={formData.imageUrl}
                     onChange={handleChange}
-                    placeholder="Or paste image URL"
-                    className="w-full px-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="https://example.com/image.jpg"
+                    maxLength={255}
+                    className={`w-full px-4 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                      formData.imageUrl.length > 255 ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
+                  {formData.imageUrl.length > 255 && (
+                    <p className="mt-1 text-xs text-red-600">Image URL is too long (max 255 characters)</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -507,7 +556,7 @@ function BlogForm() {
             <div className="flex justify-end space-x-4">
               <button
                 type="button"
-                onClick={() => navigate('/blogs')}
+                onClick={() => navigate(id ? `/blogs/${id}` : '/blogs')}
                 className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
               >
                 Cancel

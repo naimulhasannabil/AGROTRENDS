@@ -1,23 +1,38 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import HeroSection from '../components/HeroSection'
 import BlogCard from '../components/BlogCard'
 import CategoryFilter from '../components/CategoryFilter'
 import { useAuth } from '../contexts/AuthContext'
-import { getAllBlogs, getBlogsByCategory } from '../services/blogService'
+import { useGetAllBlogs, useGetBlogsByCategory } from '../services/query/blog'
 
 function Blogs() {
   const { user } = useAuth()
-  const [blogs, setBlogs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [_error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeCategory, setActiveCategory] = useState('all')
   const pageSize = 9
   
-  // Sample blogs for when backend is not available
-  const sampleBlogs = [
+  // Use React Query hooks for fetching blogs
+  const { data: allBlogsData, isLoading: isLoadingAll, error: errorAll } = useGetAllBlogs(
+    currentPage,
+    pageSize,
+    'creationDate',
+    'desc',
+    { enabled: activeCategory === 'all', retry: false }
+  )
+  
+  const { data: categoryBlogsData, isLoading: isLoadingCategory, error: errorCategory } = useGetBlogsByCategory(
+    activeCategory,
+    currentPage,
+    pageSize,
+    'creationDate',
+    'desc',
+    { enabled: activeCategory !== 'all', retry: false }
+  )
+  
+  // Sample blogs for when backend is not available (kept for future use)
+  const _sampleBlogs = [
     {
       blogId: 'sample-1',
       title: 'Getting Started with Modern Agriculture',
@@ -89,60 +104,21 @@ function Blogs() {
     { id: 4, name: 'Technologies' }
   ]
   
-  const [activeCategory, setActiveCategory] = useState('all')
+  // Determine which data to use based on active category
+  const loading = activeCategory === 'all' ? isLoadingAll : isLoadingCategory
+  const error = activeCategory === 'all' ? errorAll : errorCategory
+  const apiData = activeCategory === 'all' ? allBlogsData : categoryBlogsData
   
-  // Fetch blogs from API
-  useEffect(() => {
-    fetchBlogs()
-  }, [currentPage, activeCategory])
+  // Check if error is due to authentication (401/403)
+  const isAuthError = error?.response?.status === 401 || error?.response?.status === 403
   
-  const fetchBlogs = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      let response
-      
-      if (activeCategory === 'all') {
-        response = await getAllBlogs(currentPage, pageSize, 'creationDate', 'desc')
-      } else {
-        response = await getBlogsByCategory(activeCategory, currentPage, pageSize, 'creationDate', 'desc')
-      }
-      
-      console.log('Blogs API response:', response)
-      
-      // Handle different response structures
-      if (response && Array.isArray(response) && response.length > 0) {
-        // Direct array response (already normalized by service)
-        setBlogs(response)
-        setTotalPages(Math.ceil(response.length / pageSize) || 1)
-      } else if (response?.content && Array.isArray(response.content) && response.content.length > 0) {
-        // Paginated response with content array
-        setBlogs(response.content)
-        setTotalPages(response.totalPages || 1)
-      } else {
-        // No blogs from API, use sample blogs
-        console.log('No blogs from API, loading sample blogs')
-        loadSampleBlogs()
-      }
-    } catch (err) {
-      console.error('Error fetching blogs:', err)
-      // On error, load sample blogs instead of showing empty page
-      loadSampleBlogs()
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  const loadSampleBlogs = () => {
-    if (activeCategory === 'all') {
-      setBlogs(sampleBlogs)
-    } else {
-      const filtered = sampleBlogs.filter(blog => blog.categoryId === activeCategory)
-      setBlogs(filtered)
-    }
-    setTotalPages(1)
-    setError(null)
-  }
+  // Extract blogs and pagination info from API response
+  // API returns: { data: { status, message, payload: { content: [...blogs], totalPages, ... }, success } }
+  const responseData = apiData?.data
+  const payload = responseData?.payload
+  const blogsData = payload?.content || payload || responseData?.content || responseData || []
+  const blogs = Array.isArray(blogsData) ? blogsData : []
+  const totalPages = payload?.totalPages || responseData?.totalPages || apiData?.totalPages || 1
   
   // Filter blogs based on search query (client-side filtering)
   const filteredBlogs = blogs.filter(blog => {
@@ -165,10 +141,7 @@ function Blogs() {
   }
   
   // Check if user is an author (userType array includes 'AUTHOR')
-  console.log('Blogs page - Current user:', user)
-  console.log('Blogs page - userType:', user?.userType)
   const isAuthor = user?.userType?.includes('AUTHOR')
-  console.log('Blogs page - isAuthor:', isAuthor)
   
   return (
     <>
@@ -180,45 +153,20 @@ function Blogs() {
       />
       
       {/* User Mode Indicator & Author Actions */}
-      {user && (
+      {user && isAuthor && (
         <section className="py-5 bg-white border-b shadow-sm">
           <div className="container-custom">
-            <div className="flex justify-between items-center">
-              {/* Mode Indicator */}
-              <div className="flex items-center space-x-2">
-                {isAuthor ? (
-                  <>
-                    <div className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg">
-                      <svg className="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                      </svg>
-                      <span className="font-semibold text-blue-700">Author Mode</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg">
-                      <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                      </svg>
-                      <span className="font-semibold text-green-700">User Mode</span>
-                    </div>
-                  </>
-                )}
-              </div>
-              
+            <div className="flex justify-end items-center">
               {/* Create Blog Button - Only for Authors */}
-              {isAuthor && (
-                <Link 
-                  to="/blogs/create" 
-                  className="btn-primary inline-flex items-center shadow-md hover:shadow-lg transition-shadow duration-200"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Create New Blog
-                </Link>
-              )}
+              <Link 
+                to="/blogs/create" 
+                className="btn-primary inline-flex items-center shadow-md hover:shadow-lg transition-shadow duration-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create New Blog
+              </Link>
             </div>
           </div>
         </section>
@@ -259,6 +207,38 @@ function Blogs() {
             <div className="text-center py-16">
               <div className="inline-block animate-spin rounded-full h-14 w-14 border-4 border-gray-200 border-t-primary-600"></div>
               <p className="mt-5 text-gray-600 font-medium">Loading blogs...</p>
+            </div>
+          ) : isAuthError || (!user && error) ? (
+            /* Show sign-up message when there's an auth error or user is not logged in */
+            <div className="text-center py-16 max-w-2xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg p-8">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mx-auto text-primary-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <h3 className="text-2xl font-bold text-gray-800 mb-3">Join AgroTrends Community</h3>
+                <p className="text-gray-600 mb-6">
+                  Sign up to access our collection of agricultural blogs, connect with farmers, and stay updated with the latest farming techniques and technologies.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Link 
+                    to="/sign-up"
+                    state={{ from: '/blogs' }}
+                    className="btn-primary py-3 px-8 text-lg inline-block text-center"
+                  >
+                    Sign Up Now
+                  </Link>
+                  <Link 
+                    to="/sign-in"
+                    state={{ from: '/blogs' }}
+                    className="px-8 py-3 border-2 border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 font-medium text-lg inline-block text-center"
+                  >
+                    Sign In
+                  </Link>
+                </div>
+                <p className="mt-4 text-sm text-gray-500">
+                  Already have an account? <Link to="/sign-in" state={{ from: '/blogs' }} className="text-primary-600 hover:text-primary-800 font-medium">Sign in here</Link>
+                </p>
+              </div>
             </div>
           ) : filteredBlogs.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

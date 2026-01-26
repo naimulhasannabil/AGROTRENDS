@@ -17,18 +17,34 @@ function BlogCard({ blog = {} }) {
     category = 'General' 
   } = blog;
   
+  // Helper function to strip HTML tags and decode entities
+  const stripHtml = (html) => {
+    if (!html) return '';
+    const tmp = document.createElement('DIV');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   // Use the correct field names from API
   const displayId = blogId || id
   const displayTitle = title
-  const displayAuthor = authorName || author
+  // Handle author which can be a string or an object
+  const displayAuthor = typeof authorName === 'string' 
+    ? authorName 
+    : (authorName?.user?.name || authorName?.user?.firstName || (typeof author === 'object' ? (author?.user?.name || author?.user?.firstName || 'Unknown') : author) || 'Unknown')
   const displayDate = createdDate ? new Date(createdDate).toLocaleDateString('en-US', { 
     year: 'numeric', 
     month: 'long', 
     day: 'numeric' 
   }) : date
-  const displayExcerpt = content ? content.substring(0, 150) + (content.length > 150 ? '...' : '') : excerpt
+  // Strip HTML tags and entities from content
+  const cleanContent = stripHtml(content || excerpt);
+  const displayExcerpt = cleanContent ? cleanContent.substring(0, 150) + (cleanContent.length > 150 ? '...' : '') : ''
   const displayImage = imageUrl || image || 'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
-  const displayCategory = categoryName || category
+  // Handle categoryName which can be either a string or an object
+  const displayCategory = typeof categoryName === 'string' 
+    ? categoryName 
+    : (categoryName?.categoryName || (typeof category === 'object' && category?.categoryName) || category || 'Uncategorized')
   
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg">
