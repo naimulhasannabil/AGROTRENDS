@@ -2,10 +2,12 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import HeroSection from '../components/HeroSection'
 import BlogCard from '../components/BlogCard'
+import { useAuth } from '../contexts/AuthContext'
 import { useGetAllCategories } from '../services/query/categories'
 import { useGetAllBlogs, useGetBlogsByCategory } from '../services/query/blog'
 
 function Categories() {
+  const { user } = useAuth()
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [currentPage, setCurrentPage] = useState(0)
   const pageSize = 9
@@ -213,7 +215,39 @@ function Categories() {
               : `${categories.find(c => c.id === selectedCategory)?.categoryName || ''} Blogs`}
           </h2>
           
-          {loading ? (
+          {!user ? (
+            /* Show sign-up message when user is not logged in */
+            <div className="text-center py-16 max-w-2xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg p-8">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mx-auto text-primary-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <h3 className="text-2xl font-bold text-gray-800 mb-3">Unlock Category Insights</h3>
+                <p className="text-gray-600 mb-6">
+                  Sign up to explore category-specific blogs, expert tips, and comprehensive agricultural resources tailored to your farming needs.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Link 
+                    to="/sign-up"
+                    state={{ from: '/categories' }}
+                    className="btn-primary py-3 px-8 text-lg inline-block text-center"
+                  >
+                    Sign Up Now
+                  </Link>
+                  <Link 
+                    to="/sign-in"
+                    state={{ from: '/categories' }}
+                    className="px-8 py-3 border-2 border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 font-medium text-lg inline-block text-center"
+                  >
+                    Sign In
+                  </Link>
+                </div>
+                <p className="mt-4 text-sm text-gray-500">
+                  Already have an account? <Link to="/sign-in" state={{ from: '/categories' }} className="text-primary-600 hover:text-primary-800 font-medium">Sign in here</Link>
+                </p>
+              </div>
+            </div>
+          ) : loading ? (
             <div className="text-center py-16">
               <div className="inline-block animate-spin rounded-full h-14 w-14 border-4 border-gray-200 border-t-primary-600"></div>
               <p className="mt-5 text-gray-600 font-medium">Loading blogs...</p>
@@ -240,12 +274,7 @@ function Categories() {
       <section className="py-16 bg-white">
         <div className="container-custom">
           <h2 className="text-3xl font-bold mb-8 text-center">Browse by Category</h2>
-          {loadingCategories ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {displayCategories.map(category => (
                 <div key={category.id} className="bg-[#DAFCE7] rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:-translate-y-2 hover:shadow-xl">
                   <div className="relative">
@@ -310,7 +339,6 @@ function Categories() {
                 </div>
               ))}
             </div>
-          )}
         </div>
       </section>
       

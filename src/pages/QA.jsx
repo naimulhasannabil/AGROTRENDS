@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
 import { notification, Modal } from 'antd'
@@ -637,7 +638,39 @@ function QA() {
         <div className="container-custom">
           <h2 className="text-3xl font-bold text-center mb-12">Community Questions</h2>
           
-          {isLoadingAllQuestions ? (
+          {!user ? (
+            /* Show sign-up message when user is not logged in */
+            <div className="text-center py-16 max-w-2xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg p-8">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mx-auto text-primary-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="text-2xl font-bold text-gray-800 mb-3">Join the Farming Community</h3>
+                <p className="text-gray-600 mb-6">
+                  Sign up to ask questions, share your farming experiences, and get expert answers from fellow farmers and agricultural specialists.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Link 
+                    to="/sign-up"
+                    state={{ from: '/qa' }}
+                    className="btn-primary py-3 px-8 text-lg inline-block text-center"
+                  >
+                    Sign Up Now
+                  </Link>
+                  <Link 
+                    to="/sign-in"
+                    state={{ from: '/qa' }}
+                    className="px-8 py-3 border-2 border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 font-medium text-lg inline-block text-center"
+                  >
+                    Sign In
+                  </Link>
+                </div>
+                <p className="mt-4 text-sm text-gray-500">
+                  Already have an account? <Link to="/sign-in" state={{ from: '/qa' }} className="text-primary-600 hover:text-primary-800 font-medium">Sign in here</Link>
+                </p>
+              </div>
+            </div>
+          ) : isLoadingAllQuestions ? (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             </div>
