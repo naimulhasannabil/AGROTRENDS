@@ -1,17 +1,67 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import HeroSection from '../components/HeroSection'
 import BlogCard from '../components/BlogCard'
 import CategoryFilter from '../components/CategoryFilter'
 import { useAuth } from '../contexts/AuthContext'
 import { useGetAllBlogs, useGetBlogsByCategory } from '../services/query/blog'
+import { getAllCategories } from '../services/categoryService'
 
 function Blogs() {
   const { user } = useAuth()
   const [currentPage, setCurrentPage] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
+  const [categories, setCategories] = useState([{ id: 'all', name: 'All' }])
+  const [loadingCategories, setLoadingCategories] = useState(true)
   const pageSize = 9
+  
+  // Fetch categories on component mount using the categoryService
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true)
+        console.log('Fetching categories...')
+        
+        // Use the categoryService which handles authentication properly
+        const data = await getAllCategories(0, 50, 'categoryName', 'asc')
+        console.log('Categories response:', data)
+        
+        // Handle both array and paginated response
+        const categoriesArray = Array.isArray(data) 
+          ? data 
+          : (data.payload?.content || data.payload || data.content || [])
+        
+        console.log('Parsed categories array:', categoriesArray)
+        
+        if (categoriesArray.length > 0) {
+          // Transform categories to match the format needed for CategoryFilter
+          const transformedCategories = [
+            { id: 'all', name: 'All' },
+            ...categoriesArray.map(cat => ({
+              id: cat.categoryId || cat.id,
+              name: cat.categoryName || cat.name
+            }))
+          ]
+          
+          console.log('Transformed categories:', transformedCategories)
+          setCategories(transformedCategories)
+        } else {
+          console.warn('No categories found in response')
+          setCategories([{ id: 'all', name: 'All' }])
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+        console.error('Error details:', error.response?.data)
+        // Keep the default "All" category if fetching fails
+        setCategories([{ id: 'all', name: 'All' }])
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+    
+    fetchCategories()
+  }, [])
   
   // Use React Query hooks for fetching blogs
   const { data: allBlogsData, isLoading: isLoadingAll, error: errorAll } = useGetAllBlogs(
@@ -30,79 +80,6 @@ function Blogs() {
     'desc',
     { enabled: activeCategory !== 'all', retry: false }
   )
-  
-  // Sample blogs for when backend is not available (kept for future use)
-  const _sampleBlogs = [
-    {
-      blogId: 'sample-1',
-      title: 'Getting Started with Modern Agriculture',
-      content: 'Discover the latest trends and technologies revolutionizing the agricultural industry. From precision farming to sustainable practices, learn how modern methods are transforming traditional farming.',
-      imageUrl: 'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      authorName: 'AgroTrends Team',
-      categoryName: 'Technologies',
-      categoryId: 4,
-      createdDate: '2025-12-20T10:00:00Z'
-    },
-    {
-      blogId: 'sample-2',
-      title: 'Sustainable Irrigation Methods',
-      content: 'Learn about water-efficient irrigation techniques that help farmers optimize water usage while maintaining healthy crops. Discover drip irrigation, sprinkler systems, and smart water management solutions.',
-      imageUrl: 'https://images.pexels.com/photos/1483880/pexels-photo-1483880.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      authorName: 'Water Conservation Expert',
-      categoryName: 'Crops',
-      categoryId: 3,
-      createdDate: '2025-12-18T10:00:00Z'
-    },
-    {
-      blogId: 'sample-3',
-      title: 'Smart Cattle Management Systems',
-      content: 'Explore how IoT and AI technologies are helping livestock farmers monitor animal health, track movements, and optimize feeding schedules for better productivity and animal welfare.',
-      imageUrl: 'https://images.pexels.com/photos/2280551/pexels-photo-2280551.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      authorName: 'Livestock Specialist',
-      categoryName: 'Cattles',
-      categoryId: 2,
-      createdDate: '2025-12-15T10:00:00Z'
-    },
-    {
-      blogId: 'sample-4',
-      title: 'Aquaculture Innovation and Best Practices',
-      content: 'Dive into the world of modern fish farming with insights on sustainable aquaculture practices, water quality management, and breeding techniques for optimal fish production.',
-      imageUrl: 'https://images.pexels.com/photos/1112080/pexels-photo-1112080.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      authorName: 'Aquaculture Expert',
-      categoryName: 'Fisheries',
-      categoryId: 1,
-      createdDate: '2025-12-12T10:00:00Z'
-    },
-    {
-      blogId: 'sample-5',
-      title: 'Climate-Resilient Crop Varieties',
-      content: 'New crop varieties are being developed to withstand changing climate conditions. Learn about drought-resistant, heat-tolerant, and disease-resistant crops that ensure food security.',
-      imageUrl: 'https://images.pexels.com/photos/265216/pexels-photo-265216.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      authorName: 'Agricultural Scientist',
-      categoryName: 'Crops',
-      categoryId: 3,
-      createdDate: '2025-12-10T10:00:00Z'
-    },
-    {
-      blogId: 'sample-6',
-      title: 'Precision Agriculture with Drones',
-      content: 'Discover how drone technology is revolutionizing farming with aerial crop monitoring, precision spraying, and real-time field analysis for data-driven decision making.',
-      imageUrl: 'https://images.pexels.com/photos/2886937/pexels-photo-2886937.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      authorName: 'Tech Agriculture Advisor',
-      categoryName: 'Technologies',
-      categoryId: 4,
-      createdDate: '2025-12-08T10:00:00Z'
-    }
-  ]
-  
-  // Categories for filter
-  const categories = [
-    { id: 'all', name: 'All' },
-    { id: 1, name: 'Fisheries' },
-    { id: 2, name: 'Cattles' },
-    { id: 3, name: 'Crops' },
-    { id: 4, name: 'Technologies' }
-  ]
   
   // Determine which data to use based on active category
   const loading = activeCategory === 'all' ? isLoadingAll : isLoadingCategory
@@ -163,7 +140,7 @@ function Blogs() {
                 className="btn-primary inline-flex items-center shadow-md hover:shadow-lg transition-shadow duration-200"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 Create New Blog
               </Link>
@@ -192,11 +169,21 @@ function Blogs() {
             </div>
           </div>
           
-          <CategoryFilter 
-            categories={categories} 
-            activeCategory={activeCategory} 
-            onCategoryChange={handleCategoryChange} 
-          />
+          {/* Show loading state while categories are being fetched */}
+          {loadingCategories ? (
+            <div className="text-center py-4">
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-gray-200 border-t-primary-600"></div>
+              <p className="mt-2 text-sm text-gray-500">Loading categories...</p>
+            </div>
+          ) : (
+            <>
+              <CategoryFilter 
+                categories={categories} 
+                activeCategory={activeCategory} 
+                onCategoryChange={handleCategoryChange} 
+              />
+            </>
+          )}
         </div>
       </section>
       

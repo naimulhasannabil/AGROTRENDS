@@ -404,25 +404,31 @@ function BlogDetail() {
         </div>
       )}
 
-      {/* Hero Image */}
-      <div className="relative h-96 bg-gray-900">
-        {blog.imageUrl && (
+      {/* Hero Image - Responsive */}
+      <div className="relative h-64 md:h-80 lg:h-96 bg-gray-900">
+        {blog.imageUrl ? (
           <img 
             src={blog.imageUrl} 
             alt={blog.title} 
             className="w-full h-full object-cover opacity-80"
           />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-400 to-primary-600">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 md:h-24 md:w-24 text-white opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
       </div>
 
       {/* Blog Content */}
-      <div className="container-custom py-8">
+      <div className="container-custom py-4 md:py-8 px-4">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
           <Link 
             to="/blogs" 
-            className="inline-flex items-center text-primary-600 hover:text-primary-800 mb-6"
+            className="inline-flex items-center text-primary-600 hover:text-primary-800 mb-4 md:mb-6"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -431,8 +437,8 @@ function BlogDetail() {
           </Link>
 
           {/* Blog Header */}
-          <div className="bg-white rounded-lg shadow-md p-8 mb-8">
-            <h1 className="text-4xl font-bold mb-4">{blog.title}</h1>
+          <div className="bg-white rounded-lg shadow-md p-4 md:p-8 mb-6 md:mb-8">
+            <h1 className="text-2xl md:text-4xl font-bold mb-4">{blog.title}</h1>
             
             {/* Category Badge */}
             {blog.categoryName && (
@@ -443,7 +449,7 @@ function BlogDetail() {
               </div>
             )}
             
-            <div className="flex items-center justify-between mb-6 pb-6 border-b">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-6 border-b gap-4">
               <div className="flex items-center space-x-4">
                 <div>
                   <p className="text-gray-600">
@@ -467,14 +473,20 @@ function BlogDetail() {
                 <div className="flex space-x-2">
                   <Link 
                     to={`/blogs/edit/${blog.blogId}`}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                    className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm md:text-base inline-flex items-center"
                   >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
                     Edit
                   </Link>
                   <button 
                     onClick={() => setShowDeleteModal(true)}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm md:text-base inline-flex items-center"
                   >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
                     Delete
                   </button>
                 </div>
@@ -482,25 +494,25 @@ function BlogDetail() {
             </div>
 
             {/* Blog Content */}
-            <div className="prose max-w-none">
+            <div className="prose prose-sm md:prose-lg max-w-none">
               <div 
-                className="text-lg leading-relaxed text-gray-700"
+                className="text-base md:text-lg leading-relaxed text-gray-700"
                 dangerouslySetInnerHTML={{ __html: blog.content }}
               />
             </div>
           </div>
 
           {/* Comments Section */}
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <h2 className="text-2xl font-bold mb-6">Comments ({comments.length})</h2>
+          <div className="bg-white rounded-lg shadow-md p-4 md:p-8">
+            <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Comments ({comments.length})</h2>
 
             {/* Add Comment Form */}
             {user ? (
-              <div className="mb-8">
-                <div className="flex items-start space-x-3">
+              <div className="mb-6 md:mb-8">
+                <div className="flex items-start space-x-2 md:space-x-3">
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                      <span className="text-primary-600 font-semibold text-sm">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                      <span className="text-primary-600 font-semibold text-xs md:text-sm">
                         {user.username?.charAt(0).toUpperCase()}
                       </span>
                     </div>
@@ -519,8 +531,8 @@ function BlogDetail() {
                 </div>
               </div>
             ) : (
-              <div className="mb-8 p-4 bg-gray-50 rounded-md text-center">
-                <p className="text-gray-600">
+              <div className="mb-6 md:mb-8 p-4 bg-gray-50 rounded-md text-center">
+                <p className="text-gray-600 text-sm md:text-base">
                   <Link to="/sign-in" className="text-primary-600 hover:text-primary-800 font-medium">
                     Sign in
                   </Link> to join the conversation
@@ -529,47 +541,47 @@ function BlogDetail() {
             )}
 
             {/* Comments List */}
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
               {comments.map(comment => (
-                <div key={comment.commentId} className="border-b pb-6 last:border-b-0">
-                  <div className="flex items-start space-x-3">
+                <div key={comment.commentId} className="border-b pb-4 md:pb-6 last:border-b-0">
+                  <div className="flex items-start space-x-2 md:space-x-3">
                     {/* Avatar */}
                     <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <span className="text-blue-600 font-semibold text-sm">
+                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <span className="text-blue-600 font-semibold text-xs md:text-sm">
                           {comment.username?.charAt(0).toUpperCase()}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       {/* Comment Header */}
                       <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h4 className="font-semibold">{comment.username}</h4>
-                          <p className="text-sm text-gray-500">{formatDate(comment.createdDate)}</p>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm md:text-base truncate">{comment.username}</h4>
+                          <p className="text-xs md:text-sm text-gray-500">{formatDate(comment.createdDate)}</p>
                         </div>
 
                         {/* Comment Actions (Edit/Delete) - Only for comment owner */}
                         {user && comment.userId === user.id && (
-                          <div className="flex space-x-2">
+                          <div className="flex space-x-1 md:space-x-2 ml-2">
                             {editingComment !== comment.commentId && (
                               <>
                                 <button
                                   onClick={() => handleEditComment(comment)}
-                                  className="text-sm text-blue-600 hover:text-blue-800"
+                                  className="text-sm text-blue-600 hover:text-blue-800 p-1"
                                   title="Edit comment"
                                 >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <svg className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                                   </svg>
                                 </button>
                                 <button
                                   onClick={() => handleDeleteComment(comment.commentId)}
-                                  className="text-sm text-red-600 hover:text-red-800"
+                                  className="text-sm text-red-600 hover:text-red-800 p-1"
                                   title="Delete comment"
                                 >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <svg className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                                   </svg>
                                 </button>
@@ -600,13 +612,13 @@ function BlogDetail() {
                         </div>
                       ) : (
                         <>
-                          <p className="text-gray-700 mb-3">{comment.content}</p>
+                          <p className="text-gray-700 mb-3 text-sm md:text-base break-words">{comment.content}</p>
                           
                           {/* Reply Button */}
                           {user && (
                             <button
                               onClick={() => setReplyTo({ commentId: comment.commentId })}
-                              className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+                              className="text-xs md:text-sm text-primary-600 hover:text-primary-800 font-medium"
                             >
                               Reply
                             </button>
@@ -616,10 +628,10 @@ function BlogDetail() {
 
                       {/* Reply Form after main comment */}
                       {replyTo?.commentId === comment.commentId && !replyTo?.replyId && (
-                        <div className="mt-3 ml-8">
+                        <div className="mt-3 ml-4 md:ml-8">
                           <div className="flex items-start space-x-2">
                             <div className="flex-shrink-0">
-                              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                              <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-green-100 flex items-center justify-center">
                                 <span className="text-green-600 font-semibold text-xs">
                                   {user.username?.charAt(0).toUpperCase()}
                                 </span>
@@ -648,35 +660,35 @@ function BlogDetail() {
 
                       {/* Replies */}
                       {comment.replies && comment.replies.length > 0 && (
-                        <div className="ml-8 mt-4 space-y-4">
+                        <div className="ml-4 md:ml-8 mt-4 space-y-3 md:space-y-4">
                           {comment.replies.map(reply => (
-                            <div key={reply.replyId} className="bg-gray-50 p-4 rounded-md">
+                            <div key={reply.replyId} className="bg-gray-50 p-3 md:p-4 rounded-md">
                               <div className="flex items-start space-x-2">
                                 {/* Reply Avatar */}
                                 <div className="flex-shrink-0">
-                                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-purple-100 flex items-center justify-center">
                                     <span className="text-purple-600 font-semibold text-xs">
                                       {reply.username?.charAt(0).toUpperCase()}
                                     </span>
                                   </div>
                                 </div>
 
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0">
                                   {/* Reply Header */}
                                   <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                      <h5 className="font-semibold text-sm">{reply.username}</h5>
+                                    <div className="flex-1 min-w-0">
+                                      <h5 className="font-semibold text-xs md:text-sm truncate">{reply.username}</h5>
                                       <p className="text-xs text-gray-500">{formatDate(reply.createdDate)}</p>
                                     </div>
 
                                     {/* Reply Actions (Edit/Delete) - Only for reply owner */}
                                     {user && reply.userId === user.id && (
-                                      <div className="flex space-x-2">
+                                      <div className="flex space-x-1 ml-2">
                                         {editingReply !== reply.replyId && (
                                           <>
                                             <button
                                               onClick={() => handleEditReply(reply)}
-                                              className="text-sm text-blue-600 hover:text-blue-800"
+                                              className="text-sm text-blue-600 hover:text-blue-800 p-1"
                                               title="Edit reply"
                                             >
                                               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -685,7 +697,7 @@ function BlogDetail() {
                                             </button>
                                             <button
                                               onClick={() => handleDeleteReply(comment.commentId, reply.replyId)}
-                                              className="text-sm text-red-600 hover:text-red-800"
+                                              className="text-sm text-red-600 hover:text-red-800 p-1"
                                               title="Delete reply"
                                             >
                                               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -719,7 +731,7 @@ function BlogDetail() {
                                     </div>
                                   ) : (
                                     <>
-                                      <p className="text-gray-700 text-sm mb-2">{reply.content}</p>
+                                      <p className="text-gray-700 text-xs md:text-sm mb-2 break-words">{reply.content}</p>
                                       
                                       {/* Reply Button for nested replies */}
                                       {user && (
@@ -738,7 +750,7 @@ function BlogDetail() {
                                     <div className="mt-3">
                                       <div className="flex items-start space-x-2">
                                         <div className="flex-shrink-0">
-                                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                                          <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-green-100 flex items-center justify-center">
                                             <span className="text-green-600 font-semibold text-xs">
                                               {user.username?.charAt(0).toUpperCase()}
                                             </span>
@@ -776,7 +788,7 @@ function BlogDetail() {
               ))}
 
               {comments.length === 0 && (
-                <p className="text-center text-gray-500 py-8">
+                <p className="text-center text-gray-500 py-6 md:py-8 text-sm md:text-base">
                   No comments yet. Be the first to share your thoughts!
                 </p>
               )}
@@ -787,13 +799,13 @@ function BlogDetail() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md">
-            <h3 className="text-xl font-bold mb-4">Delete Blog</h3>
-            <p className="text-gray-600 mb-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 md:p-8 max-w-md w-full">
+            <h3 className="text-lg md:text-xl font-bold mb-4">Delete Blog</h3>
+            <p className="text-gray-600 mb-6 text-sm md:text-base">
               Are you sure you want to delete this blog? This action cannot be undone.
             </p>
-            <div className="flex space-x-4">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
               <button
                 onClick={handleDeleteBlog}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"

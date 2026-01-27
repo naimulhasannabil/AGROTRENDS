@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import HeroSection from '../components/HeroSection'
 import FeatureCard from '../components/FeatureCard'
@@ -6,6 +6,8 @@ import BlogCard from '../components/BlogCard'
 import CategoryFilter from '../components/CategoryFilter'
 import WeatherWidget from '../components/WeatherWidget'
 import AIInsights from '../components/AIInsights'
+import { useGetAllBlogs, useGetBlogsByCategory } from '../services/query/blog'
+import { getAllCategories } from '../services/categoryService'
 
 // Icons for feature cards
 const BookIcon = ({ className }) => (
@@ -33,6 +35,76 @@ const ChartIcon = ({ className }) => (
 )
 
 function Home() {
+  const [activeCategory, setActiveCategory] = useState('all')
+  const [categories, setCategories] = useState([{ id: 'all', name: 'All' }])
+  const [loadingCategories, setLoadingCategories] = useState(true)
+  const pageSize = 3 // Show only 3 blogs on homepage
+  
+  // Fetch categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true)
+        console.log('Home - Fetching categories...')
+        
+        // Use the categoryService which handles authentication properly
+        const data = await getAllCategories(0, 50, 'categoryName', 'asc')
+        console.log('Home - Categories response:', data)
+        
+        // Handle both array and paginated response
+        const categoriesArray = Array.isArray(data) 
+          ? data 
+          : (data.payload?.content || data.payload || data.content || [])
+        
+        console.log('Home - Parsed categories array:', categoriesArray)
+        
+        if (categoriesArray.length > 0) {
+          // Transform categories to match the format needed for CategoryFilter
+          const transformedCategories = [
+            { id: 'all', name: 'All' },
+            ...categoriesArray.map(cat => ({
+              id: cat.categoryId || cat.id,
+              name: cat.categoryName || cat.name
+            }))
+          ]
+          
+          console.log('Home - Transformed categories:', transformedCategories)
+          setCategories(transformedCategories)
+        } else {
+          console.warn('Home - No categories found in response')
+          setCategories([{ id: 'all', name: 'All' }])
+        }
+      } catch (error) {
+        console.error('Home - Error fetching categories:', error)
+        console.error('Home - Error details:', error.response?.data)
+        // Keep the default "All" category if fetching fails
+        setCategories([{ id: 'all', name: 'All' }])
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+    
+    fetchCategories()
+  }, [])
+  
+  // Use React Query hooks for fetching blogs
+  const { data: allBlogsData, isLoading: isLoadingAll, error: errorAll } = useGetAllBlogs(
+    0, // page 0
+    pageSize,
+    'creationDate',
+    'desc',
+    { enabled: activeCategory === 'all', retry: false }
+  )
+  
+  const { data: categoryBlogsData, isLoading: isLoadingCategory, error: errorCategory } = useGetBlogsByCategory(
+    activeCategory,
+    0, // page 0
+    pageSize,
+    'creationDate',
+    'desc',
+    { enabled: activeCategory !== 'all', retry: false }
+  )
+  
   // Sample data for features
   const features = [
     {
@@ -61,45 +133,16 @@ function Home() {
     }
   ]
   
-  // Sample data for blogs
-  const blogs = [
-    {
-      id: 1,
-      title: 'New Age of Farming',
-      author: 'sadiq',
-      date: 'May 11, 2025',
-      excerpt: 'This blog is a comprehensive lesson about new age of farming',
-      image: 'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      category: 'Uncategorized'
-    },
-    {
-      id: 2,
-      title: 'Sustainable Irrigation Methods',
-      author: 'Emily Johnson',
-      date: 'May 8, 2025',
-      excerpt: 'Learn about water-efficient irrigation techniques for sustainable farming',
-      image: 'https://images.pexels.com/photos/1483880/pexels-photo-1483880.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      category: 'Uncategorized'
-    },
-    {
-      id: 3,
-      title: 'The Future of Vertical Farming',
-      author: 'Michael Chen',
-      date: 'May 3, 2025',
-      excerpt: 'Exploring how vertical farming technologies are revolutionizing urban agriculture',
-      image: 'https://images.pexels.com/photos/2886937/pexels-photo-2886937.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      category: 'Uncategorized'
-    }
-  ]
+  // Determine which data to use based on active category
+  const loading = activeCategory === 'all' ? isLoadingAll : isLoadingCategory
+  const error = activeCategory === 'all' ? errorAll : errorCategory
+  const apiData = activeCategory === 'all' ? allBlogsData : categoryBlogsData
   
-  // Categories for filter
-  const categories = [
-    { id: 'all', name: 'All' },
-    { id: 'fisheries', name: 'Fisheries' },
-    { id: 'cattles', name: 'Cattles' }
-  ]
-  
-  const [activeCategory, setActiveCategory] = useState('all')
+  // Extract blogs from API response
+  const responseData = apiData?.data
+  const payload = responseData?.payload
+  const blogsData = payload?.content || payload || responseData?.content || responseData || []
+  const blogs = Array.isArray(blogsData) ? blogsData : []
   
   return (
     <>
@@ -144,6 +187,7 @@ function Home() {
               <WeatherWidget />
             </div>
           </div>
+          
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Latest Insights</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
@@ -151,20 +195,54 @@ function Home() {
             </p>
           </div>
           
-          <CategoryFilter 
-            categories={categories} 
-            activeCategory={activeCategory} 
-            onCategoryChange={setActiveCategory} 
-          />
+          {/* Show loading state while categories are being fetched */}
+          {loadingCategories ? (
+            <div className="text-center py-4">
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-gray-200 border-t-primary-600"></div>
+              <p className="mt-2 text-sm text-gray-500">Loading categories...</p>
+            </div>
+          ) : (
+            <>
+              <CategoryFilter 
+                categories={categories} 
+                activeCategory={activeCategory} 
+                onCategoryChange={setActiveCategory} 
+              />
+            </>
+          )}
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {blogs.map(blog => (
-              <BlogCard key={blog.id} blog={blog} />
-            ))}
-          </div>
+          {/* Blogs Display */}
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="inline-block animate-spin rounded-full h-14 w-14 border-4 border-gray-200 border-t-primary-600"></div>
+              <p className="mt-5 text-gray-600 font-medium">Loading blogs...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-16">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className="text-2xl font-semibold text-gray-800 mb-2">Unable to load blogs</h3>
+              <p className="text-gray-600 mb-4">Please try again later</p>
+            </div>
+          ) : blogs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {blogs.map(blog => (
+                <BlogCard key={blog.blogId || blog.id} blog={blog} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="text-2xl font-semibold text-gray-800 mb-2">No blogs available</h3>
+              <p className="text-gray-600 mb-4">Check back soon for new content</p>
+            </div>
+          )}
           
           <div className="text-center mt-12">
-            <Link to="/blogs" className="btn-secondary  hover:bg-green-600 hover:text-white">
+            <Link to="/blogs" className="btn-secondary hover:bg-green-600 hover:text-white">
               View All Blogs
             </Link>
           </div>

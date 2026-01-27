@@ -192,126 +192,121 @@ Late Blight:
   }
   
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      // Check if file is an image
-      if (!file.type.startsWith('image/')) {
-        alert('Please upload an image file')
-        return
+  const file = e.target.files[0]
+  if (file) {
+    // Check if file is an image
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file')
+      return
+    }
+
+    // Create image preview URL
+    const imagePreviewUrl = URL.createObjectURL(file)
+
+    // Add user message showing image upload
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: '', // Empty content, only show image
+      timestamp: new Date().toLocaleTimeString(),
+      imageUrl: imagePreviewUrl
+    }
+    setMessages(prev => [...prev, userMessage])
+    setIsTyping(true)
+
+    try {
+      // Create FormData and send to disease detection API
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('https://nur2712-agro-trends-ai.hf.space/predict', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('API request failed')
       }
 
-      // Create image preview URL
-      const imagePreviewUrl = URL.createObjectURL(file)
-
-      // Add user message showing image upload
-      const userMessage = {
-        id: Date.now(),
-        type: 'user',
-        content: '', // Empty content, only show image
-        timestamp: new Date().toLocaleTimeString(),
-        imageUrl: imagePreviewUrl
-      }
-      setMessages(prev => [...prev, userMessage])
-      setIsTyping(true)
-
-      try {
-        // Create FormData and send to disease detection API
-        const formData = new FormData()
-        formData.append('file', file)
-
-        const response = await fetch('https://nur2712-agro-trends-ai.hf.space/predict', {
-          method: 'POST',
-          body: formData
-        })
-
-        if (!response.ok) {
-          throw new Error('API request failed')
-        }
-
-        const result = await response.json()
-        
-        // Format the AI response with disease detection results
-        const predictionName = result.prediction.replace(/_/g, ' ')
-        const confidenceValue = parseFloat(result.confidence)
-        
-        // Check if confidence is too low (not a valid crop/plant image)
-        if (confidenceValue < 30) {
-          const errorResponse = `⚠️ **INVALID IMAGE DETECTED**\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-            `🚫 **Analysis Failed**\n` +
-            `   The image you uploaded does not appear to be a valid crop or plant image that our disease detection system can analyze.\n\n` +
-            `📊 **Confidence Level**\n` +
-            `   ➤ ${result.confidence} ❌\n\n` +
-            `🌾 **What We're Looking For:**\n` +
-            `   ✓ Clear, well-lit photos of crop leaves\n` +
-            `   ✓ Close-up images showing plant diseases\n` +
-            `   ✓ Photos of agricultural crops (corn, wheat, tomato, etc.)\n` +
-            `   ✓ Leaves with visible symptoms or healthy plants\n\n` +
-            `❌ **Common Issues:**\n` +
-            `   × Random objects, animals, or people\n` +
-            `   × Blurry or poorly lit images\n` +
-            `   × Non-plant content\n` +
-            `   × Screenshots or drawings\n\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `💡 **Next Steps**\n` +
-            `Please upload a clear photo of a crop leaf or plant for accurate disease detection. Make sure the image is focused and well-lit.\n\n` +
-            `📸 Need help? Take a photo directly showing the affected plant leaves or crop area.`
-
-          const aiMessage = {
-            id: Date.now() + 1,
-            type: 'ai',
-            content: errorResponse,
-            timestamp: new Date().toLocaleTimeString()
-          }
-          
-          setMessages(prev => [...prev, aiMessage])
-          setIsTyping(false)
-          e.target.value = ''
-          return
-        }
-        
-        const aiResponse = `🌿 **CROP DISEASE ANALYSIS COMPLETE**\n` +
-          `───────────────────────\n\n` +
-          `🎯 **Primary Diagnosis**\n` +
-          `   ➤ ${predictionName}\n\n` +
+      const result = await response.json()
+      
+      // Format the AI response with disease detection results
+      const predictionName = result.prediction.replace(/_/g, ' ')
+      const confidenceValue = parseFloat(result.confidence)
+      
+      // Check if confidence is too low (not a valid crop/plant image)
+      if (confidenceValue < 50) {
+        const errorResponse = `⚠️ **INVALID IMAGE DETECTED**\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `🚫 **Analysis Failed**\n` +
+          `   The image you uploaded does not appear to be a valid crop or plant image that our disease detection system can analyze.\n\n` +
           `📊 **Confidence Level**\n` +
-          `   ➤ ${result.confidence} ${confidenceValue >= 80 ? '✅ High Confidence' : confidenceValue >= 60 ? '⚠️ Moderate' : '⚠️ Low Confidence'}\n\n` +
-          `📋 **Detailed Analysis (Top 5)**\n` +
-          result.top_5.map((item, index) => {
-            const probability = (parseFloat(item.probability) * 100).toFixed(2)
-            const bar = '█'.repeat(Math.round(parseFloat(item.probability) * 20))
-            return `   ${index + 1}. ${item.class.replace(/_/g, ' ')}\n      ${bar} ${probability}%`
-          }).join('\n\n') +
-          `\n\n───────────────────────\n` +
-          `👨‍⚕️ **Expert Recommendation**\n` +
-          `For accurate treatment and management of this condition, we recommend consulting with a certified agricultural specialist or plant pathologist. They can provide tailored solutions based on your specific growing conditions.\n\n` +
-          `📞 Need help finding an expert? Contact your local agricultural extension office.`
+          `   ➤ ${result.confidence} ❌\n\n` +
+          `🌾 **What We're Looking For:**\n` +
+          `   ✓ Clear, well-lit photos of crop leaves\n` +
+          `   ✓ Close-up images showing plant diseases\n` +
+          `   ✓ Photos of agricultural crops (corn, wheat, tomato, etc.)\n` +
+          `   ✓ Leaves with visible symptoms or healthy plants\n\n` +
+          `❌ **Common Issues:**\n` +
+          `   × Random objects, animals, or people\n` +
+          `   × Blurry or poorly lit images\n` +
+          `   × Non-plant content\n` +
+          `   × Screenshots or drawings\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `💡 **Next Steps**\n` +
+          `Please upload a clear photo of a crop leaf or plant for accurate disease detection. Make sure the image is focused and well-lit.`
 
         const aiMessage = {
           id: Date.now() + 1,
           type: 'ai',
-          content: aiResponse,
-          timestamp: new Date().toLocaleTimeString(),
-          gradcamUrl: result.gradcam_image_url ? `https://nur2712-agro-trends-ai.hf.space${result.gradcam_image_url}` : null
+          content: errorResponse,
+          timestamp: new Date().toLocaleTimeString()
         }
         
         setMessages(prev => [...prev, aiMessage])
-      } catch (error) {
-        console.error('Error analyzing image:', error)
-        const errorMessage = {
-          id: Date.now() + 1,
-          type: 'ai',
-          content: '❌ Sorry, I encountered an error analyzing the image. Please ensure the model is running and try again.',
-          timestamp: new Date().toLocaleTimeString()
-        }
-        setMessages(prev => [...prev, errorMessage])
-      } finally {
         setIsTyping(false)
-        // Reset file input
         e.target.value = ''
+        return
       }
+      
+      const aiResponse = `🌿 **CROP DISEASE ANALYSIS COMPLETE**\n` +
+        `───────────────────────\n\n` +
+        `🎯 **Primary Diagnosis**\n` +
+        `   ➤ ${predictionName}\n\n` +
+        `📊 **Confidence Level**\n` +
+        `   ➤ ${result.confidence} ${confidenceValue >= 80 ? '✅ High Confidence' : confidenceValue >= 60 ? '⚠️ Moderate' : '⚠️ Low Confidence'}\n\n` +
+        `📋 **Detailed Analysis (Top 5)**\n` +
+        result.top_5.map((item, index) => {
+          const probability = (parseFloat(item.probability) * 100).toFixed(2)
+          const bar = '█'.repeat(Math.round(parseFloat(item.probability) * 20))
+          return `   ${index + 1}. ${item.class.replace(/_/g, ' ')}\n      ${bar} ${probability}%`
+        }).join('\n\n')
+
+      const aiMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: aiResponse,
+        timestamp: new Date().toLocaleTimeString(),
+        gradcamUrl: result.gradcam_image_url ? `https://nur2712-agro-trends-ai.hf.space${result.gradcam_image_url}` : null
+      }
+      
+      setMessages(prev => [...prev, aiMessage])
+    } catch (error) {
+      console.error('Error analyzing image:', error)
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: '❌ Sorry, I encountered an error analyzing the image. Please ensure the model is running and try again.',
+        timestamp: new Date().toLocaleTimeString()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsTyping(false)
+      // Reset file input
+      e.target.value = ''
     }
   }
+}
   
   const _handleYieldPrediction = async (e) => {
     e.preventDefault()

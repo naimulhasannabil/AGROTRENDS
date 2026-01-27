@@ -546,7 +546,7 @@ function QA() {
         </div>
       </section>
       
-      {/* My Questions - Grid View (Similar to Crops) */}
+      {/* My Questions - Grid View (Simplified - Only Title and Content) */}
       {user && (
         <section className="py-12 bg-gray-50">
           <div className="container-custom">
@@ -569,44 +569,9 @@ function QA() {
                           </span>
                         </div>
                         <div 
-                          className="text-gray-700 mb-4 line-clamp-3"
+                          className="text-gray-700"
                           dangerouslySetInnerHTML={{ __html: item.content }}
                         />
-                        
-                        <div className="space-y-2 text-sm mb-4">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Asked by:</span>
-                            <span className="font-medium">{item.user?.name || 'Unknown'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Email:</span>
-                            <span className="font-medium text-xs">{item.user?.email || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">User Type:</span>
-                            <span className="font-medium">
-                              {item.user?.userTypes?.join(', ') || 'N/A'}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="mb-4">
-                          <h4 className="font-medium mb-2">User Roles:</h4>
-                          <div className="flex flex-wrap gap-1">
-                            {item.user?.roles?.map((role) => (
-                              <span 
-                                key={role.roleId || role.id || role.roleName} 
-                                className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"
-                              >
-                                {role.roleName}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        <button className="btn-primary w-full" onClick={() => toggleQuestion(item.id)}>
-                          View Details
-                        </button>
                       </div>
                     </div>
                   ))}
