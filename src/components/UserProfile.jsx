@@ -363,12 +363,47 @@ function UserProfile() {
                   <div className="flex items-center justify-between py-2 border-b">
                     <span className="text-sm text-gray-600">Member Since</span>
                     <span className="text-sm font-medium text-gray-800">
-                      {profileData?.creationDate 
-                        ? new Date(profileData.creationDate).toLocaleDateString()
-                        : user?.createdAt 
-                        ? new Date(user.createdAt).toLocaleDateString()
-                        : 'N/A'
-                      }
+                      {(() => {
+                        const pick = profileData || user || {}
+
+                        const dateCandidates = [
+                          pick.creationDate,
+                          pick.createdDate,
+                          pick.createdAt,
+                          pick.creationDateTimeStamp,
+                          pick.createdDateTimeStamp,
+                          pick.creationTimestamp
+                        ]
+
+                        let dt = null
+                        for (const c of dateCandidates) {
+                          if (!c && c !== 0) continue
+                          // number (assume epoch ms or s)
+                          if (typeof c === 'number') {
+                            // if seconds (10 digits) convert to ms
+                            dt = c > 1e12 ? new Date(c) : new Date(c * 1000)
+                            if (!isNaN(dt)) break
+                          }
+
+                          // string
+                          if (typeof c === 'string') {
+                            // try ISO parse
+                            const parsed = Date.parse(c)
+                            if (!isNaN(parsed)) {
+                              dt = new Date(parsed)
+                              break
+                            }
+                            // try numeric string
+                            const asNum = Number(c)
+                            if (!isNaN(asNum)) {
+                              dt = asNum > 1e12 ? new Date(asNum) : new Date(asNum * 1000)
+                              if (!isNaN(dt)) break
+                            }
+                          }
+                        }
+
+                        return dt && !isNaN(dt) ? dt.toLocaleDateString() : 'N/A'
+                      })()}
                     </span>
                   </div>
                 </div>
