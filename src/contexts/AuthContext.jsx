@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { signOut as signOutService, updateProfile as updateProfileService } from '../services/authService'
+import { signOut as signOutService, updateProfile as updateProfileService, getUserProfile } from '../services/authService'
 import { useQueryClient } from '@tanstack/react-query'
 
 const AuthContext = createContext()
@@ -29,23 +29,50 @@ function AuthProvider({ children }) {
     
     // Only load user if both user data and token exist
     if (storedUser && token) {
-      try {
-        const parsedUser = JSON.parse(storedUser)
-        console.log('Parsed user from localStorage:', parsedUser)
-        console.log('User userType:', parsedUser.userType)
-        setUser(parsedUser)
-      } catch (error) {
-        console.error('Error parsing stored user:', error)
-        localStorage.removeItem('agrotrends_user')
-        localStorage.removeItem('token')
-      }
+      (async () => {
+        try {
+          const parsedUser = JSON.parse(storedUser)
+          console.log('Parsed user from localStorage:', parsedUser)
+
+          // Try to fetch fresh profile from API to ensure `username` is present
+          try {
+            const profileResponse = await getUserProfile()
+            // profileResponse may be shaped as { success, payload: { user } } or { payload } or raw user
+            const remote = profileResponse?.payload?.user || profileResponse?.payload || profileResponse?.data || profileResponse
+
+            const email = remote?.email || remote?.userEmail || parsedUser?.email || parsedUser?.userEmail
+            const remoteName = remote?.username || remote?.name || (email && typeof email === 'string' ? email.split('@')[0] : null)
+
+            const merged = {
+              ...parsedUser,
+              ...remote,
+              username: parsedUser.username || remoteName || parsedUser.userName || parsedUser.name
+            }
+
+            console.log('Merged user from localStorage and /api/user/me:', merged)
+            setUser(merged)
+            localStorage.setItem('agrotrends_user', JSON.stringify(merged))
+          } catch (err) {
+            // If profile fetch fails, fall back to stored user
+            console.warn('Could not fetch /api/user/me, using stored user', err)
+            const parsedUser = JSON.parse(storedUser)
+            setUser(parsedUser)
+          }
+        } catch (error) {
+          console.error('Error parsing stored user:', error)
+          localStorage.removeItem('agrotrends_user')
+          localStorage.removeItem('token')
+        } finally {
+          setLoading(false)
+        }
+      })()
     } else {
       console.log('No complete auth data found')
       // Clear any partial data
       localStorage.removeItem('agrotrends_user')
       localStorage.removeItem('token')
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
    const logout = async () => {
@@ -72,6 +99,17 @@ function AuthProvider({ children }) {
     console.log('Received userType:', userData.userType)
     console.log('Received userTypes:', userData.userTypes)
     
+    // Ensure username exists; derive from email local-part if necessary
+    const emailForDerive = userData.email || userData.userEmail || (userData.user && userData.user.email)
+
+    // derive a human-friendly display name first (full name / name / first+last)
+    let derivedDisplayName = userData.displayName || userData.fullName || userData.full_name || userData.name || null
+    if (!derivedDisplayName && userData.user && (userData.user.firstName || userData.user.lastName)) {
+      derivedDisplayName = `${userData.user.firstName || ''} ${userData.user.lastName || ''}`.trim()
+    }
+    // fallback to email local-part only for handle, not for display name
+    const derivedHandle = userData.username || userData.userName || (derivedDisplayName ? null : (emailForDerive && typeof emailForDerive === 'string' ? emailForDerive.split('@')[0] : null))
+
     const userToStore = {
       ...userData,
       id: userData.id || Date.now(),
@@ -79,7 +117,10 @@ function AuthProvider({ children }) {
       // Ensure we have userType for frontend (converted from userTypes if needed)
       userType: userData.userType || userData.userTypes || [],
       // Keep original userTypes from backend
-      userTypes: userData.userTypes || userData.userType || []
+      userTypes: userData.userTypes || userData.userType || [],
+      // store both displayName (full) and username (handle)
+      displayName: derivedDisplayName || null,
+      username: derivedHandle || null
     }
     
     console.log('User to store:', userToStore)
