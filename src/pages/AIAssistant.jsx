@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAskAI } from '../services/query/ai' // Import the custom hook
 
+// Reusable Logo component to keep design consistent
+const Logo = ({ size = 'md' }) => {
+  const sizes = {
+    sm: 'w-6 h-6',
+    md: 'w-8 h-8 sm:w-10 sm:h-10',
+    lg: 'w-14 h-14 sm:w-20 sm:h-20',
+  }
+  return (
+    <div className={`rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 shadow-2xl ${sizes[size]}`}>
+      <img src="/AgroTrends.svg" alt="AgroTrends logo" className="w-full h-full object-contain block" />
+    </div>
+  )
+}
+
 function AIAssistant() {
   const [messages, setMessages] = useState([])
   const [inputMessage, setInputMessage] = useState('')
@@ -408,8 +422,8 @@ function AIAssistant() {
               </svg>
             </button>
 
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-xl sm:text-2xl">🌾</span>
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0">
+              <Logo size="md" />
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-base sm:text-lg font-bold text-gray-800 flex items-center truncate">
@@ -437,9 +451,7 @@ function AIAssistant() {
             // Empty State
             <div className="h-full flex flex-col items-center justify-center px-4 py-8 sm:py-12">
               <div className="w-24 h-24 sm:w-32 sm:h-32 mb-4 sm:mb-6 relative">
-                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl">
-                  <span className="text-4xl sm:text-6xl">🌾</span>
-                </div>
+                <Logo size="lg" />
                 <div className="absolute -top-2 -right-2 bg-white border border-gray-200 rounded-full p-1.5 sm:p-2">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -478,7 +490,7 @@ function AIAssistant() {
                               <img 
                                 src={message.imageUrl} 
                                 alt="Uploaded crop" 
-                                className="rounded-lg w-full h-auto max-h-48 sm:max-h-72 object-cover border-2 border-white/30 shadow-lg"
+                                className="rounded-lg w-full h-auto max-h-48 sm:max-h-72 object-contain border-2 border-white/30 shadow-lg"
                               />
                             </div>
                           )}
