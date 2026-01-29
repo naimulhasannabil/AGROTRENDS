@@ -21,12 +21,15 @@ import {
   useDeleteAnswer
 } from '../services/query/answer'
 
+import { formatDate } from '../utils/dateUtils'
+import { useUserByEmail, useUserById } from '../services/query'
+
 // Utility function for date formatting
-const formatDate = (dateString) => {
-  if (!dateString) return 'Unknown date'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+// const formatDate = (dateString) => {
+//   if (!dateString) return 'Unknown date'
+//   const date = new Date(dateString)
+//   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+// }
 
 // Component to render nested replies (Facebook-style)
 const NestedReply = ({ 
@@ -60,14 +63,14 @@ const NestedReply = ({
     <div className={`${depth > 0 ? 'ml-8 mt-3' : 'mt-3'} pl-4 border-l-2 border-gray-200`}>
       <div className="bg-gray-50 p-3 rounded-lg">
         {isEditingReply ? (
-          <div className="space-y-2">
+            <div className="space-y-2">
             <CommentEditor
               value={editAnswerContent}
               onChange={(e) => {
                 const newValue = e?.target?.value ?? e
                 setEditAnswerContent(newValue)
               }}
-              onSubmit={() => handleUpdateAnswer(questionId, replyId)}
+              onSubmit={() => handleUpdateAnswer(replyId)}
               placeholder="Edit your reply..."
               submitLabel="Save"
               rows={3}
@@ -95,7 +98,7 @@ const NestedReply = ({
                     </svg>
                   </button>
                   <button
-                    onClick={() => handleDeleteAnswer(questionId, replyId)}
+                    onClick={() => handleDeleteAnswer(replyId)}
                     className="p-1 text-red-600 hover:bg-red-100 rounded text-xs"
                     title="Delete reply"
                   >
@@ -107,8 +110,8 @@ const NestedReply = ({
               )}
             </div>
             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span className="font-medium">{reply.username || 'Unknown User'}</span>
-              <span>{formatDate(reply.createdDate)}</span>
+              <span className="font-medium"><AuthorName displayName={reply.displayName} username={reply.username} email={reply.userEmail} createdBy={reply.created_by} userId={reply.userId} /></span>
+              <span>{formatDate(reply.creationDate)}</span>
             </div>
             {user && (
               <button
@@ -173,6 +176,16 @@ const NestedReply = ({
   )
 }
 
+// AuthorName component to resolve name by email via API
+function AuthorName({ displayName, username, email, createdBy, userId }) {
+  const mail = email || (createdBy && createdBy.includes('@') ? createdBy : null)
+  const { data: remoteByEmail } = useUserByEmail(mail)
+  const { data: remoteById } = useUserById(userId)
+
+  const resolved = displayName || remoteByEmail?.name || remoteById?.name || username || (createdBy && !createdBy.includes('@') ? createdBy : (mail ? mail.split('@')[0] : 'Unknown User'))
+  return <>{resolved}</>
+}
+
 // Component to render a single answer with its replies
 const AnswerItem = ({ 
   answer, 
@@ -229,7 +242,7 @@ const AnswerItem = ({
               const newValue = e?.target?.value ?? e
               setEditAnswerContent(newValue)
             }}
-            onSubmit={() => handleUpdateAnswer(questionId, answerId)}
+            onSubmit={() => handleUpdateAnswer(answerId)}
             placeholder="Edit your answer..."
             submitLabel="Save"
             rows={3}
@@ -257,7 +270,7 @@ const AnswerItem = ({
                   </svg>
                 </button>
                 <button
-                  onClick={() => handleDeleteAnswer(questionId, answerId)}
+                  onClick={() => handleDeleteAnswer(answerId)}
                   className="p-1 text-red-600 hover:bg-red-50 rounded text-xs"
                   title="Delete answer"
                 >
@@ -269,8 +282,8 @@ const AnswerItem = ({
             )}
           </div>
           <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-            <span>Answered by {answer.username || 'Unknown User'}</span>
-            <span>{formatDate(answer.createdDate)}</span>
+            <span>Answered by <AuthorName displayName={answer.displayName} username={answer.username} email={answer.userEmail} createdBy={answer.created_by} userId={answer.userId} /></span>
+            <span>{formatDate(answer.creationDate)}</span>
           </div>
           
           {/* Reply button and count */}
@@ -538,7 +551,7 @@ function QA() {
     setEditAnswerContent(answer.answerContent || answer.content)
   }
 
-  const handleUpdateAnswer = (questionId, answerId) => {
+  const handleUpdateAnswer = (answerId) => {
     if (!user) {
       notification.warning({
         title: 'Authentication Required',
@@ -575,7 +588,7 @@ function QA() {
     })
   }
 
-  const handleDeleteAnswer = (questionId, answerId) => {
+  const handleDeleteAnswer = (answerId) => {
     if (!user) {
       notification.warning({
         title: 'Authentication Required',
@@ -1096,8 +1109,8 @@ function QA() {
                             dangerouslySetInnerHTML={{ __html: q.content }}
                           />
                           <div className="flex items-center justify-between text-sm text-gray-500">
-                            <span>Asked by {q.username || 'Unknown User'}</span>
-                            <span>{formatDate(q.createdDate)}</span>
+                            <span>Asked by <AuthorName displayName={q.displayName} username={q.username} email={q.userEmail} createdBy={q.created_by} userId={q.userId} /></span>
+                            <span>{formatDate(q.creationDate)}</span>
                           </div>
                         </>
                       )}
