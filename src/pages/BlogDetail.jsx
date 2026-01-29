@@ -1,31 +1,35 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import CommentEditor from '../components/CommentEditor'
-import { formatDate } from '../utils/dateUtils'
+import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { 
   useGetBlog, 
   useDeleteBlog,
-  useGetComments,
-  useCreateComment,
-  useUpdateComment,
-  useDeleteComment,
-  useCreateReply,
-  useUpdateReply,
-  useDeleteReply
-} from '../services/query/blog'
+ 
+ } from '../services/query/blog'
+import {
+  useGetCommentsByBlogId,
+  useCreateComment as useCreateCommentApi,
+  useReplyToComment,
+  useUpdateComment as useUpdateCommentApi,
+  useDeleteComment as useDeleteCommentApi
+} from '../services/query/comment'
+import { useGetRepliesByParentId } from '../services/query/comment'
+import { useUserByEmail, useUserById } from '../services/query'
 import { useQueryClient } from '@tanstack/react-query'
 
 function BlogDetail() {
   const { id } = useParams()
-  const navigate = useNavigate()
+  // const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
   
   // State management
   const [newComment, setNewComment] = useState('')
   const [replyTo, setReplyTo] = useState(null)
-  const [replyText, setReplyText] = useState('')
+  // map of reply editor text by key: 'c-<commentId>' for top-level, 'r-<replyId>' for nested
+  const [replyTexts, setReplyTexts] = useState({})
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [editingComment, setEditingComment] = useState(null)
   const [editCommentText, setEditCommentText] = useState('')
@@ -38,35 +42,87 @@ function BlogDetail() {
   const { data: blogData, isLoading, error: blogError } = useGetBlog(id)
   
   // Fetch comments using React Query
-  const { data: commentsData } = useGetComments(id, {
-    enabled: !!id && !!user,
-    refetchInterval: 10000 // Auto-refetch every 10 seconds
-  })
+  // use comment API hook; enable only when id and user exist
+  const { data: commentsData } = useGetCommentsByBlogId(user && id ? id : null)
   
   // Extract comments from response
   const comments = useMemo(() => {
-    if (!commentsData?.data) return []
-    
-    const rawComments = commentsData.data.payload || commentsData.data.data || commentsData.data
+    if (!commentsData) return []
+
+    const rawComments = commentsData.payload || commentsData.data || commentsData
     
     if (Array.isArray(rawComments)) {
-      return rawComments.map(comment => ({
-        commentId: comment.commentId || comment.id,
-        content: comment.content || comment.commentContent,
-        userId: comment.userId || comment.user?.id,
-        username: comment.username || comment.user?.name,
-        userEmail: comment.userEmail || comment.user?.email,
-        createdDate: comment.createdDate || comment.creationDate,
-        replies: (comment.replies || []).map(reply => ({
-          replyId: reply.replyId || reply.id,
-          content: reply.content || reply.replyContent,
-          userId: reply.userId || reply.user?.id,
-          username: reply.username || reply.user?.name,
-          userEmail: reply.userEmail || reply.user?.email,
-          createdDate: reply.createdDate || reply.creationDate
-        })),
-        parentCommentId: comment.parentCommentId || comment.parentComment
-      }))
+      // Normalize each item first; prefer username and derive from email local-part if needed
+      const normalized = rawComments.map(item => {
+        const createdByVal = item.createdBy || item.created_by || item.username || item.user?.name || item.userEmail || item.user?.email
+
+        // Prefer explicit display/full name fields from API, then name, then username, then derive from email
+        const possibleDisplay = item.displayName || item.fullName || item.full_name || item.name || item.user?.name || item.user?.displayName || item.user?.fullName || item.user?.firstName && item.user?.lastName ? `${item.user.firstName} ${item.user.lastName}` : null
+
+        let displayName = possibleDisplay
+        if (!displayName && createdByVal && typeof createdByVal === 'string' && !createdByVal.includes('@')) {
+          displayName = createdByVal
+        }
+
+        let handle = item.username || item.user?.username || item.user?.userName || item.userName
+        if (!handle && createdByVal && typeof createdByVal === 'string' && createdByVal.includes('@')) {
+          handle = createdByVal.split('@')[0]
+        }
+
+        return {
+          commentId: item.commentId || item.id,
+          content: item.content || item.commentContent || item.replyContent,
+          userId: item.userId || item.user?.id,
+          username: handle,
+          displayName: displayName,
+          userEmail: item.userEmail || item.user?.email,
+          createdBy: createdByVal,
+          createdDate: item.createdDate || item.creationDate,
+          parentCommentId: item.parentCommentId || item.parentComment || item.parentCommentId || null,
+          // keep raw flag to distinguish replies coming as separate items
+          isReply: !!(item.parentCommentId || item.parentComment)
+        }
+      })
+
+      // Build map of parent comments
+      const parents = []
+      const parentMap = new Map()
+
+      normalized.forEach(item => {
+        if (!item.isReply) {
+          const node = { ...item, replies: [] }
+          parents.push(node)
+          parentMap.set(String(item.commentId), node)
+        }
+      })
+
+      // Attach replies to their parent; if parent not found, treat as top-level
+      normalized.forEach(item => {
+        if (item.isReply) {
+          const pid = String(item.parentCommentId || item.commentId)
+          const parent = parentMap.get(pid)
+          const replyNode = {
+            replyId: item.commentId,
+            content: item.content,
+            userId: item.userId,
+            username: item.username,
+            displayName: item.displayName,
+            userEmail: item.userEmail,
+            createdBy: item.createdBy,
+            createdDate: item.createdDate
+          }
+          if (parent) {
+            parent.replies.push(replyNode)
+          } else {
+            // no parent found, push as top-level comment with this reply info
+            const orphan = { ...item, replies: [replyNode] }
+            parents.push(orphan)
+            parentMap.set(String(item.commentId), orphan)
+          }
+        }
+      })
+
+      return parents
     }
     
     return []
@@ -105,67 +161,17 @@ function BlogDetail() {
       setShowDeleteModal(false)
       queryClient.invalidateQueries(['blogs'])
       queryClient.invalidateQueries(['blog'])
-      alert('Blog deleted successfully!')
-      navigate('/blogs')
     },
     onError: (err) => {
       console.error('Error deleting blog:', err)
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete blog. Please try again.'
-      alert(errorMessage)
-      setShowDeleteModal(false)
+      alert('Failed to delete blog. Please try again.')
     }
   })
-  
-  // Comment mutations
-  const createCommentMutation = useCreateComment({
+
+  // reuse update/delete comment APIs for replies as backend commonly shares endpoints
+  const updateReplyMutation = useUpdateCommentApi({
     onSuccess: () => {
-      queryClient.invalidateQueries(['comments', id])
-      setNewComment('')
-    },
-    onError: (err) => {
-      console.error('Error adding comment:', err)
-      alert('Failed to post comment. Please try again.')
-    }
-  })
-  
-  const updateCommentMutation = useUpdateComment({
-    onSuccess: () => {
-      queryClient.invalidateQueries(['comments', id])
-      setEditingComment(null)
-      setEditCommentText('')
-    },
-    onError: (err) => {
-      console.error('Error updating comment:', err)
-      alert('Failed to update comment. Please try again.')
-    }
-  })
-  
-  const deleteCommentMutation = useDeleteComment({
-    onSuccess: () => {
-      queryClient.invalidateQueries(['comments', id])
-    },
-    onError: (err) => {
-      console.error('Error deleting comment:', err)
-      alert('Failed to delete comment. Please try again.')
-    }
-  })
-  
-  // Reply mutations
-  const createReplyMutation = useCreateReply({
-    onSuccess: () => {
-      queryClient.invalidateQueries(['comments', id])
-      setReplyText('')
-      setReplyTo(null)
-    },
-    onError: (err) => {
-      console.error('Error adding reply:', err)
-      alert('Failed to post reply. Please try again.')
-    }
-  })
-  
-  const updateReplyMutation = useUpdateReply({
-    onSuccess: () => {
-      queryClient.invalidateQueries(['comments', id])
+      queryClient.invalidateQueries(['comments', 'blog', id])
       setEditingReply(null)
       setEditReplyText('')
     },
@@ -175,15 +181,233 @@ function BlogDetail() {
     }
   })
   
-  const deleteReplyMutation = useDeleteReply({
+  const deleteReplyMutation = useDeleteCommentApi({
     onSuccess: () => {
-      queryClient.invalidateQueries(['comments', id])
+      queryClient.invalidateQueries(['comments', 'blog', id])
     },
     onError: (err) => {
       console.error('Error deleting reply:', err)
       alert('Failed to delete reply. Please try again.')
     }
   })
+
+  // Comment mutations (create/update/delete)
+  const createCommentMutation = useCreateCommentApi({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', 'blog', id])
+      setNewComment('')
+    },
+    onError: (err) => {
+      console.error('Error adding comment:', err)
+      alert('Failed to post comment. Please try again.')
+    }
+  })
+
+  const updateCommentMutation = useUpdateCommentApi({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', 'blog', id])
+      setEditingComment(null)
+      setEditCommentText('')
+    },
+    onError: (err) => {
+      console.error('Error updating comment:', err)
+      alert('Failed to update comment. Please try again.')
+    }
+  })
+
+  const deleteCommentMutation = useDeleteCommentApi({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', 'blog', id])
+    },
+    onError: (err) => {
+      console.error('Error deleting comment:', err)
+      alert('Failed to delete comment. Please try again.')
+    }
+  })
+
+  // Create reply mutation
+  const createReplyMutation = useReplyToComment()
+  
+  // Component to resolve and render an author's display name
+  const AuthorName = ({ displayName, username, userEmail, createdBy, userId }) => {
+    // prefer explicit email if provided in userEmail or createdBy
+    const email = userEmail || (createdBy && createdBy.includes('@') ? createdBy : null)
+    const { data: remoteByEmail } = useUserByEmail(email)
+    const { data: remoteById } = useUserById(userId)
+    const resolved = displayName || remoteByEmail?.name || remoteById?.name || username || (email ? email.split('@')[0] : (createdBy && !createdBy.includes('@') ? createdBy : 'Unknown'))
+    return <>{resolved}</>
+  }
+
+  // Replies component: fetch replies for a parent and render them (falls back to any initialReplies)
+  const Replies = ({ parentId, initialReplies = [] }) => {
+    const { data: repliesData, isLoading } = useGetRepliesByParentId(parentId)
+
+    const fetched = useMemo(() => {
+      if (!repliesData) return []
+      const raw = repliesData.payload || repliesData.data || repliesData
+      if (Array.isArray(raw)) {
+        // map raw replies to normalized nodes and include parentReplyId if provided by API
+        const mapped = raw.map(r => {
+          const createdByVal = r.createdBy || r.created_by || r.username || r.user?.name || r.userEmail || r.user?.email
+
+          const possibleDisplay = r.displayName || r.fullName || r.full_name || r.name || r.user?.name || r.user?.displayName || r.user?.fullName || (r.user?.firstName && r.user?.lastName ? `${r.user.firstName} ${r.user.lastName}` : null)
+          let displayName = possibleDisplay
+          if (!displayName && createdByVal && typeof createdByVal === 'string' && !createdByVal.includes('@')) {
+            displayName = createdByVal
+          }
+
+          let handle = r.username || r.user?.username || r.user?.userName || r.userName
+          if (!handle && createdByVal && typeof createdByVal === 'string' && createdByVal.includes('@')) {
+            handle = createdByVal.split('@')[0]
+          }
+
+          return {
+            replyId: String(r.commentId || r.replyId || r.id),
+            content: r.content || r.replyContent,
+            userId: r.userId || r.user?.id,
+            username: handle,
+            displayName: displayName,
+            userEmail: r.userEmail || r.user?.email,
+            createdBy: createdByVal,
+            createdDate: r.creationDate || r.createdDate,
+            // API may provide parentReplyId field (snake or camel)
+            parentReplyId: r.parentReplyId || r.parent_reply_id || r.parentReply || null
+          }
+        })
+
+        // build a tree from mapped replies using parentReplyId
+        const nodes = new Map()
+        mapped.forEach(n => nodes.set(n.replyId, { ...n, children: [] }))
+
+        const roots = []
+        nodes.forEach(node => {
+          if (node.parentReplyId) {
+            const parent = nodes.get(String(node.parentReplyId))
+            if (parent) parent.children.push(node)
+            else roots.push(node)
+          } else {
+            roots.push(node)
+          }
+        })
+
+        return roots
+      }
+      return []
+    }, [repliesData])
+
+    const replies = (fetched && fetched.length > 0) ? fetched : (initialReplies || [])
+
+    // render a threaded tree recursively
+    const renderNode = (node, depth = 0) => (
+      <div key={node.replyId} className="bg-gray-50 p-3 md:p-4 rounded-md" style={{ marginLeft: depth * 12 }}>
+        <div className="flex items-start space-x-2">
+          <div className="flex-shrink-0">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-purple-100 flex items-center justify-center">
+              <span className="text-purple-600 font-semibold text-xs">{node.username?.charAt(0).toUpperCase()}</span>
+            </div>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-start mb-2">
+              <div className="flex-1 min-w-0">
+                <h5 className="font-semibold text-xs md:text-sm truncate">
+                  <AuthorName displayName={node.displayName} username={node.username} userEmail={node.userEmail} createdBy={node.createdBy} userId={node.userId} />
+                </h5>
+                <p className="text-xs text-gray-500">
+                  {node.createdDate ? formatDateTime(node.createdDate) : ''}
+                </p>
+              </div>
+
+              {user && node.userId === user.id && (
+                <div className="flex space-x-1 ml-2">
+                  {editingReply !== node.replyId && (
+                    <>
+                      <button onClick={() => handleEditReply(node)} className="text-sm text-blue-600 hover:text-blue-800 p-1" title="Edit reply">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                      </button>
+                      <button onClick={() => handleDeleteReply(parentId, node.replyId)} className="text-sm text-red-600 hover:text-red-800 p-1" title="Delete reply">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {editingReply === node.replyId ? (
+              <div className="mt-2">
+                <CommentEditor 
+                  value={editReplyText} 
+                  onChange={(e) => setEditReplyText(e.target.value)} 
+                  onSubmit={() => handleUpdateReply(parentId, node.replyId)} 
+                  onCancel={() => { 
+                    setEditingReply(null); 
+                    setEditReplyText('') 
+                  }} 
+                  placeholder="Edit your reply..." 
+                  submitLabel="Save" 
+                  showCancel={true} 
+                  autoFocus={true} 
+                  rows={2} 
+                  size="small" 
+                />
+              </div>
+            ) : (
+              <>
+                <p className="text-gray-700 text-xs md:text-sm mb-2 break-words">{node.content}</p>
+                {user && (
+                  <button onClick={() => setReplyTo({ commentId: parentId, replyId: node.replyId })} className="text-xs text-primary-600 hover:text-primary-800 font-medium">Reply</button>
+                )}
+              </>
+            )}
+
+            {/* Reply editor for replying to a specific reply (nested) */}
+            {replyTo?.commentId === parentId && replyTo?.replyId === node.replyId && (
+              <div className="mt-3">
+                <div className="flex items-start space-x-2">
+                  <div className="flex-shrink-0">
+                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                      <span className="text-primary-600 font-semibold text-xs">{user.username?.charAt(0).toUpperCase()}</span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <CommentEditor
+                      value={replyTexts[`r-${node.replyId}`] || ''}
+                      onChange={(e) => setReplyTexts(prev => ({ ...prev, [`r-${node.replyId}`]: e.target.value }))}
+                      onSubmit={() => handleReplySubmit(parentId, node.replyId)}
+                      onCancel={() => {
+                        setReplyTo(null)
+                        setReplyTexts(prev => { const c = { ...prev }; delete c[`r-${node.replyId}`]; return c })
+                      }}
+                      placeholder="Write your reply..."
+                      submitLabel="Reply"
+                      showCancel={true}
+                      autoFocus={true}
+                      rows={2}
+                      size="small"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* render children */}
+            {node.children && node.children.length > 0 && (
+              <div className="mt-3 space-y-3">
+                {node.children.map(child => renderNode(child, depth + 1))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+
+    return (
+      <>
+        {replies.map(r => renderNode(r))}
+      </>
+    )
+  }
   
   // Check if user is the blog author
   const isBlogAuthor = blog && user && (
@@ -229,13 +453,64 @@ function BlogDetail() {
     }
     
     if (newComment.trim()) {
+      const commentDisplay = user.displayName || user.name || user.username || (user.email ? (user.email.split('@')[0]) : null)
       const commentData = {
         blogId: id,
         userId: user.id,
         content: newComment,
-        username: user.username
+        username: user.username,
+        displayName: commentDisplay,
+        createdBy: commentDisplay
       }
-      createCommentMutation.mutate(commentData)
+
+      const tempId = `temp-${Date.now()}`
+      const optimistic = {
+        commentId: tempId,
+        content: commentData.content,
+        userId: commentData.userId,
+        username: commentData.username,
+        displayName: commentData.displayName,
+        userEmail: user.email,
+        createdBy: commentData.createdBy,
+        createdDate: new Date().toISOString()
+      }
+
+      const queryKey = ['comments', 'blog', id]
+
+      try {
+        await createCommentMutation.mutateAsync(commentData, {
+          onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey })
+            const previous = queryClient.getQueryData(queryKey)
+
+            const insert = (prev) => {
+              if (!prev) return [optimistic]
+              const raw = prev.payload || prev.data || prev
+              if (Array.isArray(raw)) {
+                const newRaw = [optimistic, ...raw]
+                if (prev.payload) return { ...prev, payload: newRaw }
+                if (prev.data) return { ...prev, data: newRaw }
+                return newRaw
+              }
+              return prev
+            }
+
+            queryClient.setQueryData(queryKey, insert(previous))
+            return { previous }
+          },
+          onError: (err, _vars, ctx) => {
+            if (ctx?.previous) queryClient.setQueryData(queryKey, ctx.previous)
+            console.error('Failed to post comment:', err)
+            alert('Failed to post comment. Please try again.')
+          },
+          onSettled: () => {
+            queryClient.invalidateQueries({ queryKey })
+            setNewComment('')
+          }
+        })
+      } catch (err) {
+        // errors handled in onError above
+      }
     }
   }
   
@@ -257,25 +532,168 @@ function BlogDetail() {
   
   const handleDeleteComment = async (commentId) => {
     if (confirm('Are you sure you want to delete this comment?')) {
-      deleteCommentMutation.mutate(commentId)
+      const commentsKey = ['comments', 'blog', id]
+      await queryClient.cancelQueries({ queryKey: commentsKey })
+      const previous = queryClient.getQueryData(commentsKey)
+
+      const remove = (prev) => {
+        if (!prev) return prev
+        const raw = prev.payload || prev.data || prev
+        if (Array.isArray(raw)) {
+          const newRaw = raw.filter(c => String((c.commentId || c.id)) !== String(commentId))
+          if (prev.payload) return { ...prev, payload: newRaw }
+          if (prev.data) return { ...prev, data: newRaw }
+          return newRaw
+        }
+        return prev
+      }
+
+      queryClient.setQueryData(commentsKey, remove(previous))
+
+      try {
+        await deleteCommentMutation.mutateAsync(commentId)
+        queryClient.invalidateQueries({ queryKey: commentsKey })
+      } catch (err) {
+        // rollback
+        if (previous) queryClient.setQueryData(commentsKey, previous)
+        console.error('Error deleting comment:', err)
+        alert('Failed to delete comment. Please try again.')
+      }
     }
   }
   
-  // Handle reply submission
-  const handleReplySubmit = async (commentId) => {
+  // Handle reply submission (supports nested replies via optional parentReplyId)
+  const handleReplySubmit = async (commentId, parentReplyId = null) => {
     if (!user) {
       alert('Please sign in to reply')
       return
     }
-    
-    if (replyText.trim()) {
-      const replyData = {
-        commentId,
-        userId: user.id,
-        content: replyText,
-        username: user.username
-      }
-      createReplyMutation.mutate(replyData)
+
+    const key = parentReplyId ? `r-${parentReplyId}` : `c-${commentId}`
+    const text = (replyTexts[key] || '').trim()
+    if (!text) return
+
+    const replyDisplay = user.displayName || user.name || user.username || (user.email ? (user.email.split('@')[0]) : null)
+    const replyData = {
+      // backend often expects parentCommentId
+      parentCommentId: commentId,
+      parentReplyId: parentReplyId,
+      commentId: commentId,
+      blogId: id,
+      userId: user.id,
+      content: text,
+      username: user.username,
+      displayName: replyDisplay,
+      createdBy: replyDisplay
+    }
+
+    const tempId = `temp-reply-${Date.now()}`
+    const optimisticReply = {
+      replyId: tempId,
+      content: replyData.content,
+      userId: replyData.userId,
+      username: replyData.username,
+      displayName: replyData.displayName,
+      userEmail: user.email,
+      createdBy: replyData.createdBy,
+      createdDate: new Date().toISOString(),
+      parentReplyId: parentReplyId
+    }
+
+    const repliesKey = ['comments', 'replies', commentId]
+
+    try {
+      await createReplyMutation.mutateAsync(replyData, {
+        onMutate: async () => {
+          await queryClient.cancelQueries({ queryKey: repliesKey })
+          const previous = queryClient.getQueryData(repliesKey)
+          const commentsKey = ['comments', 'blog', id]
+          const previousComments = queryClient.getQueryData(commentsKey)
+
+          const insert = (prev) => {
+            if (!prev) return [optimisticReply]
+            const raw = prev.payload || prev.data || prev
+            if (Array.isArray(raw)) {
+              const newRaw = [optimisticReply, ...raw]
+              if (prev.payload) return { ...prev, payload: newRaw }
+              if (prev.data) return { ...prev, data: newRaw }
+              return newRaw
+            }
+            return prev
+          }
+
+          queryClient.setQueryData(repliesKey, insert(previous))
+          // also insert into comments cache under the specific parent comment -> replies
+          if (previousComments) {
+            const updateComments = (prev) => {
+              if (!prev) return prev
+              const raw = prev.payload || prev.data || prev
+              if (Array.isArray(raw)) {
+                const newRaw = raw.map(c => {
+                  if (String(c.commentId || c.id) !== String(commentId)) return c
+                  const replies = c.replies || []
+                  if (!parentReplyId) {
+                    // top-level reply: prepend
+                    const replyNode = {
+                      replyId: optimisticReply.replyId,
+                      content: optimisticReply.content,
+                      userId: optimisticReply.userId,
+                      username: optimisticReply.username,
+                      displayName: optimisticReply.displayName,
+                      userEmail: optimisticReply.userEmail,
+                      createdBy: optimisticReply.createdBy,
+                      createdDate: optimisticReply.createdDate
+                    }
+                    return { ...c, replies: [replyNode, ...replies] }
+                  } else {
+                    // nested reply: attach under the matching reply as children
+                    const newReplies = replies.map(r => {
+                      if (String(r.replyId) === String(parentReplyId)) {
+                        const children = r.children || []
+                        const childNode = {
+                          replyId: optimisticReply.replyId,
+                          content: optimisticReply.content,
+                          userId: optimisticReply.userId,
+                          username: optimisticReply.username,
+                          displayName: optimisticReply.displayName,
+                          userEmail: optimisticReply.userEmail,
+                          createdBy: optimisticReply.createdBy,
+                          createdDate: optimisticReply.createdDate,
+                          parentReplyId: optimisticReply.parentReplyId
+                        }
+                        return { ...r, children: [...children, childNode] }
+                      }
+                      return r
+                    })
+                    return { ...c, replies: newReplies }
+                  }
+                })
+                if (prev.payload) return { ...prev, payload: newRaw }
+                if (prev.data) return { ...prev, data: newRaw }
+                return newRaw
+              }
+              return prev
+            }
+
+            queryClient.setQueryData(commentsKey, updateComments(previousComments))
+          }
+          return { previous }
+        },
+        onError: (err, _vars, ctx) => {
+          if (ctx?.previous) queryClient.setQueryData(repliesKey, ctx.previous)
+          console.error('Failed to post reply:', err)
+          alert('Failed to post reply. Please try again.')
+        },
+        onSettled: () => {
+          queryClient.invalidateQueries({ queryKey: repliesKey })
+          queryClient.invalidateQueries(['comments', 'blog', id])
+          // clear only this reply editor content
+          setReplyTexts(prev => { const c = { ...prev }; delete c[key]; return c })
+          setReplyTo(null)
+        }
+      })
+    } catch (err) {
+      // handled in onError
     }
   }
   
@@ -291,13 +709,82 @@ function BlogDetail() {
         replyId,
         content: editReplyText
       }
-      updateReplyMutation.mutate(updateData)
+      updateReplyMutation.mutate(updateData, {
+        onSuccess: () => {
+          queryClient.invalidateQueries(['comments', 'replies', commentId])
+        }
+      })
     }
   }
   
   const handleDeleteReply = async (commentId, replyId) => {
     if (confirm('Are you sure you want to delete this reply?')) {
-      deleteReplyMutation.mutate(replyId)
+      const repliesKey = ['comments', 'replies', commentId]
+      const commentsKey = ['comments', 'blog', id]
+
+      await queryClient.cancelQueries({ queryKey: repliesKey })
+      await queryClient.cancelQueries({ queryKey: commentsKey })
+
+      const previousReplies = queryClient.getQueryData(repliesKey)
+      const previousComments = queryClient.getQueryData(commentsKey)
+
+      const removeReply = (prev) => {
+        if (!prev) return prev
+        const raw = prev.payload || prev.data || prev
+        if (Array.isArray(raw)) {
+          const newRaw = raw.filter(r => String((r.replyId || r.commentId || r.id)) !== String(replyId))
+          if (prev.payload) return { ...prev, payload: newRaw }
+          if (prev.data) return { ...prev, data: newRaw }
+          return newRaw
+        }
+        return prev
+      }
+
+      const removeFromComments = (prev) => {
+        if (!prev) return prev
+        const raw = prev.payload || prev.data || prev
+        if (Array.isArray(raw)) {
+          const removeNested = (arr) => {
+            return arr.reduce((acc, r) => {
+              if (String((r.replyId || r.commentId || r.id)) === String(replyId)) return acc
+              const copy = { ...r }
+              if (copy.children && Array.isArray(copy.children)) {
+                copy.children = removeNested(copy.children)
+              }
+              if (copy.replies && Array.isArray(copy.replies)) {
+                copy.replies = removeNested(copy.replies)
+              }
+              acc.push(copy)
+              return acc
+            }, [])
+          }
+
+          const newRaw = raw.map(c => {
+            const replies = c.replies || []
+            const filtered = removeNested(replies)
+            return { ...c, replies: filtered }
+          })
+          if (prev.payload) return { ...prev, payload: newRaw }
+          if (prev.data) return { ...prev, data: newRaw }
+          return newRaw
+        }
+        return prev
+      }
+
+      queryClient.setQueryData(repliesKey, removeReply(previousReplies))
+      queryClient.setQueryData(commentsKey, removeFromComments(previousComments))
+
+      try {
+        await deleteReplyMutation.mutateAsync(replyId)
+        queryClient.invalidateQueries({ queryKey: repliesKey })
+        queryClient.invalidateQueries({ queryKey: commentsKey })
+      } catch (err) {
+        // rollback
+        if (previousReplies) queryClient.setQueryData(repliesKey, previousReplies)
+        if (previousComments) queryClient.setQueryData(commentsKey, previousComments)
+        console.error('Error deleting reply:', err)
+        alert('Failed to delete reply. Please try again.')
+      }
     }
   }
 
@@ -547,8 +1034,12 @@ function BlogDetail() {
                       {/* Comment Header */}
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm md:text-base truncate">{comment.username}</h4>
-                          <p className="text-xs md:text-sm text-gray-500">{formatDate(comment.createdDate)}</p>
+                          <h4 className="font-semibold text-sm md:text-base truncate">
+                            <AuthorName displayName={comment.displayName} username={comment.username} userEmail={comment.userEmail} createdBy={comment.createdBy} userId={comment.userId} />
+                          </h4>
+                          <p className="text-xs md:text-sm text-gray-500">
+                            {comment.createdDate ? formatDateTime(comment.createdDate) : ''}
+                          </p>
                         </div>
 
                         {/* Comment Actions */}
@@ -620,20 +1111,20 @@ function BlogDetail() {
                         <div className="mt-3 ml-4 md:ml-8">
                           <div className="flex items-start space-x-2">
                             <div className="flex-shrink-0">
-                              <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-green-100 flex items-center justify-center">
-                                <span className="text-green-600 font-semibold text-xs">
+                              <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                                <span className="text-primary-600 font-semibold text-xs">
                                   {user.username?.charAt(0).toUpperCase()}
                                 </span>
                               </div>
                             </div>
                             <div className="flex-1">
                               <CommentEditor
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
+                                value={replyTexts[`c-${comment.commentId}`] || ''}
+                                onChange={(e) => setReplyTexts(prev => ({ ...prev, [`c-${comment.commentId}`]: e.target.value }))}
                                 onSubmit={() => handleReplySubmit(comment.commentId)}
                                 onCancel={() => {
                                   setReplyTo(null)
-                                  setReplyText('')
+                                  setReplyTexts(prev => { const c = { ...prev }; delete c[`c-${comment.commentId}`]; return c })
                                 }}
                                 placeholder="Write your reply..."
                                 submitLabel="Reply"
@@ -647,127 +1138,9 @@ function BlogDetail() {
                         </div>
                       )}
 
-                      {/* Replies */}
-                      {comment.replies && comment.replies.length > 0 && (
-                        <div className="ml-4 md:ml-8 mt-4 space-y-3 md:space-y-4">
-                          {comment.replies.map(reply => (
-                            <div key={reply.replyId} className="bg-gray-50 p-3 md:p-4 rounded-md">
-                              <div className="flex items-start space-x-2">
-                                <div className="flex-shrink-0">
-                                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                                    <span className="text-purple-600 font-semibold text-xs">
-                                      {reply.username?.charAt(0).toUpperCase()}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex justify-between items-start mb-2">
-                                    <div className="flex-1 min-w-0">
-                                      <h5 className="font-semibold text-xs md:text-sm truncate">{reply.username}</h5>
-                                      <p className="text-xs text-gray-500">{formatDate(reply.createdDate)}</p>
-                                    </div>
-
-                                    {/* Reply Actions */}
-                                    {user && reply.userId === user.id && (
-                                      <div className="flex space-x-1 ml-2">
-                                        {editingReply !== reply.replyId && (
-                                          <>
-                                            <button
-                                              onClick={() => handleEditReply(reply)}
-                                              className="text-sm text-blue-600 hover:text-blue-800 p-1"
-                                              title="Edit reply"
-                                            >
-                                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                              </svg>
-                                            </button>
-                                            <button
-                                              onClick={() => handleDeleteReply(comment.commentId, reply.replyId)}
-                                              className="text-sm text-red-600 hover:text-red-800 p-1"
-                                              title="Delete reply"
-                                            >
-                                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                              </svg>
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Reply Content */}
-                                  {editingReply === reply.replyId ? (
-                                    <div>
-                                      <CommentEditor
-                                        value={editReplyText}
-                                        onChange={(e) => setEditReplyText(e.target.value)}
-                                        onSubmit={() => handleUpdateReply(comment.commentId, reply.replyId)}
-                                        onCancel={() => {
-                                          setEditingReply(null)
-                                          setEditReplyText('')
-                                        }}
-                                        placeholder="Edit your reply..."
-                                        submitLabel="Save"
-                                        showCancel={true}
-                                        autoFocus={true}
-                                        rows={2}
-                                        size="small"
-                                      />
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <p className="text-gray-700 text-xs md:text-sm mb-2 break-words">{reply.content}</p>
-                                      
-                                      {user && (
-                                        <button
-                                          onClick={() => setReplyTo({ commentId: comment.commentId, replyId: reply.replyId })}
-                                          className="text-xs text-primary-600 hover:text-primary-800 font-medium"
-                                        >
-                                          Reply
-                                        </button>
-                                      )}
-                                    </>
-                                  )}
-
-                                  {/* Nested Reply Form */}
-                                  {replyTo?.commentId === comment.commentId && replyTo?.replyId === reply.replyId && (
-                                    <div className="mt-3">
-                                      <div className="flex items-start space-x-2">
-                                        <div className="flex-shrink-0">
-                                          <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-green-100 flex items-center justify-center">
-                                            <span className="text-green-600 font-semibold text-xs">
-                                              {user.username?.charAt(0).toUpperCase()}
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <div className="flex-1">
-                                          <CommentEditor
-                                            value={replyText}
-                                            onChange={(e) => setReplyText(e.target.value)}
-                                            onSubmit={() => handleReplySubmit(comment.commentId)}
-                                            onCancel={() => {
-                                              setReplyTo(null)
-                                              setReplyText('')
-                                            }}
-                                            placeholder="Write your reply..."
-                                            submitLabel="Reply"
-                                            showCancel={true}
-                                            autoFocus={true}
-                                            rows={2}
-                                            size="small"
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="ml-4 md:ml-8 mt-4 space-y-3 md:space-y-4">
+                        <Replies parentId={comment.commentId} initialReplies={comment.replies} />
+                      </div>
                     </div>
                   </div>
                 </div>
