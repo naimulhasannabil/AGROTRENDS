@@ -16,7 +16,16 @@ const Logo = ({ size = 'md' }) => {
 }
 
 function AIAssistant() {
-  const [messages, setMessages] = useState([])
+  // Load messages from localStorage on init so chat persists across refreshes
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ai_messages')
+      return saved ? JSON.parse(saved) : []
+    } catch (err) {
+      console.error('Failed to load saved messages', err)
+      return []
+    }
+  })
   const [inputMessage, setInputMessage] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [responseLength, setResponseLength] = useState('medium')
@@ -24,6 +33,15 @@ function AIAssistant() {
   const messagesEndRef = useRef(null)
   const recognitionRef = useRef(null)
   const [isListening, setIsListening] = useState(false)
+
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('ai_messages', JSON.stringify(messages))
+    } catch (err) {
+      console.error('Failed to save messages', err)
+    }
+  }, [messages])
 
   // Initialize the API mutation hook
   const { mutate: askAI, isLoading: isAILoading } = useAskAI()
@@ -93,6 +111,11 @@ function AIAssistant() {
   const clearChat = () => {
     setMessages([])
     setIsSidebarOpen(false)
+    try {
+      localStorage.removeItem('ai_messages') // clear persisted chat
+    } catch (err) {
+      console.error('Failed to remove saved messages', err)
+    }
   }
 
   // Format the API response text to be more readable
