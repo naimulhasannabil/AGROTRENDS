@@ -4,8 +4,7 @@ import HeroSection from '../components/HeroSection'
 import BlogCard from '../components/BlogCard'
 import CategoryFilter from '../components/CategoryFilter'
 import { useAuth } from '../contexts/AuthContext'
-import { useGetAllBlogs, useGetBlogsByCategory } from '../services/query/blog'
-import { getAllCategories } from '../services/categoryService'
+import { useGetAllBlogs, useGetBlogsByCategory, useGetCategories } from '../services/query/blog'
 
 function Blogs() {
   const { user } = useAuth()
@@ -13,24 +12,27 @@ function Blogs() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [categories, setCategories] = useState([{ id: 'all', name: 'All' }])
-  const [loadingCategories, setLoadingCategories] = useState(true)
   const pageSize = 9
   
-  // Fetch categories on component mount using the categoryService
+  // Fetch categories using React Query
+  const { data: categoriesData, isLoading: loadingCategories } = useGetCategories(
+    0,
+    50,
+    'categoryName',
+    'asc'
+  )
+  
+  // Process categories when data is available
   useEffect(() => {
-    const fetchCategories = async () => {
+    if (categoriesData?.data) {
       try {
-        setLoadingCategories(true)
-        console.log('Fetching categories...')
-        
-        // Use the categoryService which handles authentication properly
-        const data = await getAllCategories(0, 50, 'categoryName', 'asc')
-        console.log('Categories response:', data)
+        console.log('Categories response:', categoriesData.data)
         
         // Handle both array and paginated response
-        const categoriesArray = Array.isArray(data) 
-          ? data 
-          : (data.payload?.content || data.payload || data.content || [])
+        const responseData = categoriesData.data
+        const categoriesArray = Array.isArray(responseData) 
+          ? responseData 
+          : (responseData.payload?.content || responseData.payload || responseData.content || [])
         
         console.log('Parsed categories array:', categoriesArray)
         
@@ -51,17 +53,11 @@ function Blogs() {
           setCategories([{ id: 'all', name: 'All' }])
         }
       } catch (error) {
-        console.error('Error fetching categories:', error)
-        console.error('Error details:', error.response?.data)
-        // Keep the default "All" category if fetching fails
+        console.error('Error processing categories:', error)
         setCategories([{ id: 'all', name: 'All' }])
-      } finally {
-        setLoadingCategories(false)
       }
     }
-    
-    fetchCategories()
-  }, [])
+  }, [categoriesData])
   
   // Use React Query hooks for fetching blogs
   const { data: allBlogsData, isLoading: isLoadingAll, error: errorAll } = useGetAllBlogs(

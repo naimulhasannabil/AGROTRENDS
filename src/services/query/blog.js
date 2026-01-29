@@ -108,3 +108,81 @@ export const useDeleteBlog = (options) => {
     ...options,
   });
 };
+
+// Get all categories (paginated)
+export const useGetCategories = (
+  pageNo = 0,
+  pageSize = 50,
+  sortBy = "categoryName",
+  ascOrDesc = "asc",
+  options,
+) => {
+  return useQuery({
+    queryKey: ["categories", pageNo, pageSize, sortBy, ascOrDesc],
+    queryFn: () =>
+      api.get(
+        `/api/categories/all?pageNo=${pageNo}&pageSize=${pageSize}&sortBy=${sortBy}&ascOrDesc=${ascOrDesc}`,
+      ),
+    ...options,
+  });
+};
+
+
+// Get comments by blog ID
+export const useGetComments = (blogId, options) => {
+  return useQuery({
+    queryKey: ["comments", blogId],
+    queryFn: () => api.get(`/api/blogs/${blogId}/comments`),
+    enabled: !!blogId,
+    ...options,
+  });
+};
+
+// Create comment
+export const useCreateComment = (options) => {
+  return useMutation({
+    mutationFn: (data) => api.post("/api/comments/create", data),
+    ...options,
+  });
+};
+
+// Update comment
+export const useUpdateComment = (options) => {
+  return useMutation({
+    mutationFn: (data) => api.put("/api/comments/update", data),
+    ...options,
+  });
+};
+
+// Delete comment
+export const useDeleteComment = (options) => {
+  return useMutation({
+    mutationFn: (commentId) => api.delete(`/api/comments/${commentId}/delete`),
+    ...options,
+  });
+};
+
+
+// Create reply
+export const useCreateReply = (options) => {
+  return useMutation({
+    mutationFn: (data) => api.post("/api/replies/create", data),
+    ...options,
+  });
+};
+
+// Update reply
+export const useUpdateReply = (options) => {
+  return useMutation({
+    mutationFn: (data) => api.put("/api/replies/update", data),
+    ...options,
+  });
+};
+
+// Delete reply
+export const useDeleteReply = (options) => {
+  return useMutation({
+    mutationFn: (replyId) => api.delete(`/api/replies/${replyId}/delete`),
+    ...options,
+  });
+};

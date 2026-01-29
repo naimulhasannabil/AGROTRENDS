@@ -1,62 +1,20 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getBlogById } from '../services/blogService'
-import { getAllCategories } from '../services/categoryService'
 import ReactCrop from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
 import { notification } from 'antd'
-import { useCreateBlog, useUpdateBlog } from '../services/query/blog'
+import { useCreateBlog, useUpdateBlog, useGetBlog, useGetCategories } from '../services/query/blog'
 import { useQueryClient } from '@tanstack/react-query'
 
 function BlogForm() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { user } = useAuth()
-  
-  const { mutate: createBlogMutation } = useCreateBlog({
-    onSuccess: () => {
-      // Invalidate and refetch blogs queries
-      queryClient.invalidateQueries({ queryKey: ['blogs'] })
-      notification.success({
-        title: 'Success',
-        description: 'Blog created successfully!',
-        placement: 'topRight'
-      })
-      navigate('/blogs')
-    },
-    onError: (error) => {
-      console.error('Error creating blog:', error)
-      console.error('Error response:', error.response?.data)
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create blog. Please try again.'
-      setError(errorMsg)
-      setLoading(false)
-    }
-  })
-  
-  const { mutate: updateBlogMutation } = useUpdateBlog({
-    onSuccess: () => {
-      // Invalidate and refetch blogs queries
-      queryClient.invalidateQueries({ queryKey: ['blogs'] })
-      notification.success({
-        title: 'Success',
-        description: 'Blog updated successfully!',
-        placement: 'topRight'
-      })
-      navigate('/blogs')
-    },
-    onError: (error) => {
-      console.error('Error updating blog:', error)
-      console.error('Error response:', error.response?.data)
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to update blog. Please try again.'
-      setError(errorMsg)
-      setLoading(false)
-    }
-  })
-  
   const { id } = useParams() // For editing
+  
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [categories, setCategories] = useState([])
@@ -77,6 +35,119 @@ function BlogForm() {
   const imgRef = useRef(null)
   const fileInputRef = useRef(null)
   const quillRef = useRef(null)
+
+  // Fetch blog data using React Query (for editing)
+  const { data: blogData, isLoading: blogLoading } = useGetBlog(id, {
+    enabled: !!id,
+    retry: false
+  })
+  
+  // Fetch categories using React Query
+  const { data: categoriesData, isLoading: categoriesLoading } = useGetCategories(
+    0,
+    50,
+    'categoryName',
+    'asc'
+  )
+  
+  // Process categories when data is available
+  useEffect(() => {
+    if (categoriesData?.data) {
+      try {
+        console.log('Fetched categories:', categoriesData.data)
+        
+        // Handle both array and paginated response
+        const responseData = categoriesData.data
+        const categoriesArray = Array.isArray(responseData) 
+          ? responseData 
+          : (responseData.payload?.content || responseData.payload || responseData.content || [])
+        
+        setCategories(categoriesArray)
+        
+        if (categoriesArray.length === 0) {
+          setError('No categories found. Please contact administrator.')
+        }
+      } catch (err) {
+        console.error('Error processing categories:', err)
+        setError('Failed to load categories')
+      }
+    }
+  }, [categoriesData])
+  
+  // Process blog data when available (for editing)
+  useEffect(() => {
+    if (blogData?.data && id) {
+      try {
+        const data = blogData.data.payload || blogData.data.data || blogData.data
+        
+        // Extract author ID from nested structure
+        const blogAuthorId = data.author?.user?.id || data.authorUserId || data.author?.id
+        
+        // Check if user is the author of this blog
+        if (blogAuthorId !== user.id) {
+          notification.error({
+            title: 'Unauthorized',
+            description: 'You can only edit your own blogs',
+            placement: 'topRight'
+          })
+          navigate('/blogs')
+          return
+        }
+        
+        // Extract category ID from nested structure
+        const categoryId = data.category?.id || data.categoryId
+        
+        setFormData({
+          title: data.title || '',
+          content: data.content || '',
+          imageUrl: data.imageUrl || '',
+          categoryId: categoryId || ''
+        })
+      } catch (err) {
+        console.error('Error processing blog data:', err)
+        setError('Failed to load blog')
+      }
+    }
+  }, [blogData, id, user, navigate])
+  
+  const { mutate: createBlogMutation } = useCreateBlog({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogs'] })
+      notification.success({
+        message: 'Success',
+        description: 'Blog created successfully!',
+        placement: 'topRight'
+      })
+      navigate('/blogs')
+    },
+    onError: (error) => {
+      console.error('Error creating blog:', error)
+      console.error('Error response:', error.response?.data)
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create blog. Please try again.'
+      setError(errorMsg)
+      setLoading(false)
+    }
+  })
+  
+  const { mutate: updateBlogMutation } = useUpdateBlog({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogs'] })
+      queryClient.invalidateQueries({ queryKey: ['blog', id] })
+      notification.success({
+        message: 'Success',
+        description: 'Blog updated successfully!',
+        placement: 'topRight'
+      })
+      navigate('/blogs')
+    },
+    onError: (error) => {
+      console.error('Error updating blog:', error)
+      console.error('Error response:', error.response?.data)
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to update blog. Please try again.'
+      setError(errorMsg)
+      setLoading(false)
+    }
+  })
 
   // Quill editor modules
   const modules = useMemo(() => ({
@@ -117,74 +188,7 @@ function BlogForm() {
     // Check if user is an author (userType array includes 'AUTHOR')
     const isAuthor = user?.userType?.includes('AUTHOR')
     console.log('BlogForm - isAuthor:', isAuthor)
-    
-
-    // Fetch categories after authentication check
-    fetchCategories()
-
-    // If editing, fetch the blog
-    if (id) {
-      fetchBlog()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, user, navigate])
-
-  const fetchCategories = async () => {
-    try {
-      const data = await getAllCategories(0, 50, 'categoryName', 'asc')
-      console.log('Fetched categories:', data)
-      
-      // Handle both array and paginated response
-      // Check for data.payload.content (API wrapper), data.payload, data.content, or direct array
-      const categoriesArray = Array.isArray(data) 
-        ? data 
-        : (data.payload?.content || data.payload || data.content || [])
-      setCategories(categoriesArray)
-      
-      if (categoriesArray.length === 0) {
-        setError('No categories found. Please contact administrator.')
-      }
-    } catch (err) {
-      console.error('Error fetching categories:', err)
-      setError('Failed to load categories')
-    }
-  }
-
-  const fetchBlog = async () => {
-    try {
-      setLoading(true)
-      const data = await getBlogById(id)
-      
-      // Extract author ID from nested structure
-      const blogAuthorId = data.author?.user?.id || data.authorUserId || data.author?.id
-      
-      // Check if user is the author of this blog
-      if (blogAuthorId !== user.id) {
-        notification.error({
-          title: 'Unauthorized',
-          description: 'You can only edit your own blogs',
-          placement: 'topRight'
-        })
-        navigate('/blogs')
-        return
-      }
-      
-      // Extract category ID from nested structure
-      const categoryId = data.category?.id || data.categoryId
-      
-      setFormData({
-        title: data.title || '',
-        content: data.content || '',
-        imageUrl: data.imageUrl || '',
-        categoryId: categoryId || ''
-      })
-    } catch (err) {
-      console.error('Error fetching blog:', err)
-      setError('Failed to load blog')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [user])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -258,11 +262,10 @@ function BlogForm() {
       reader.onloadend = async () => {
         const base64data = reader.result.split(',')[1]
         
-        // Upload to ImgBB - Replace with your API key
+        // Upload to ImgBB
         const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY || '3df18933133843953dea4ab8c5859e84'
         
         try {
-          // Create form data for ImgBB API
           const formData = new FormData()
           formData.append('image', base64data)
           
@@ -283,7 +286,7 @@ function BlogForm() {
             setSelectedImage(null)
             setImagePreview(null)
             notification.success({
-              title: 'Success',
+              message: 'Success',
               description: 'Image uploaded successfully!',
               placement: 'topRight'
             })
@@ -368,7 +371,7 @@ function BlogForm() {
     }
   }
 
-  if (loading && id) {
+  if (blogLoading || (id && !blogData)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -430,21 +433,25 @@ function BlogForm() {
               <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700 mb-2">
                 Category *
               </label>
-              <select
-                id="categoryId"
-                name="categoryId"
-                value={formData.categoryId}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              >
-                <option value="">Select a category</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.categoryName}
-                  </option>
-                ))}
-              </select>
+              {categoriesLoading ? (
+                <div className="text-sm text-gray-500">Loading categories...</div>
+              ) : (
+                <select
+                  id="categoryId"
+                  name="categoryId"
+                  value={formData.categoryId}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  required
+                >
+                  <option value="">Select a category</option>
+                  {categories.map(category => (
+                    <option key={category.id || category.categoryId} value={category.id || category.categoryId}>
+                      {category.categoryName || category.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Image Upload */}

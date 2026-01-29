@@ -1,18 +1,20 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import CommentEditor from '../components/CommentEditor'
-import { useGetBlog, useDeleteBlog } from '../services/query/blog'
-import { useQueryClient } from '@tanstack/react-query'
+import { formatDate } from '../utils/dateUtils'
 import { 
-  getCommentsByBlogId, 
-  addComment, 
-  updateComment, 
-  deleteComment, 
-  addReply, 
-  updateReply, 
-  deleteReply 
-} from '../services/blogService'
+  useGetBlog, 
+  useDeleteBlog,
+  useGetComments,
+  useCreateComment,
+  useUpdateComment,
+  useDeleteComment,
+  useCreateReply,
+  useUpdateReply,
+  useDeleteReply
+} from '../services/query/blog'
+import { useQueryClient } from '@tanstack/react-query'
 
 function BlogDetail() {
   const { id } = useParams()
@@ -20,12 +22,87 @@ function BlogDetail() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   
-  // Use React Query hooks
+  // State management
+  const [newComment, setNewComment] = useState('')
+  const [replyTo, setReplyTo] = useState(null)
+  const [replyText, setReplyText] = useState('')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [editingComment, setEditingComment] = useState(null)
+  const [editCommentText, setEditCommentText] = useState('')
+  const [editingReply, setEditingReply] = useState(null)
+  const [editReplyText, setEditReplyText] = useState('')
+  const [newCommentsCount, setNewCommentsCount] = useState(0)
+  const [showNotification, setShowNotification] = useState(false)
+  
+  // Fetch blog data using React Query
   const { data: blogData, isLoading, error: blogError } = useGetBlog(id)
+  
+  // Fetch comments using React Query
+  const { data: commentsData } = useGetComments(id, {
+    enabled: !!id && !!user,
+    refetchInterval: 10000 // Auto-refetch every 10 seconds
+  })
+  
+  // Extract comments from response
+  const comments = useMemo(() => {
+    if (!commentsData?.data) return []
+    
+    const rawComments = commentsData.data.payload || commentsData.data.data || commentsData.data
+    
+    if (Array.isArray(rawComments)) {
+      return rawComments.map(comment => ({
+        commentId: comment.commentId || comment.id,
+        content: comment.content || comment.commentContent,
+        userId: comment.userId || comment.user?.id,
+        username: comment.username || comment.user?.name,
+        userEmail: comment.userEmail || comment.user?.email,
+        createdDate: comment.createdDate || comment.creationDate,
+        replies: (comment.replies || []).map(reply => ({
+          replyId: reply.replyId || reply.id,
+          content: reply.content || reply.replyContent,
+          userId: reply.userId || reply.user?.id,
+          username: reply.username || reply.user?.name,
+          userEmail: reply.userEmail || reply.user?.email,
+          createdDate: reply.createdDate || reply.creationDate
+        })),
+        parentCommentId: comment.parentCommentId || comment.parentComment
+      }))
+    }
+    
+    return []
+  }, [commentsData])
+  
+  // Normalize blog data
+  const blog = useMemo(() => {
+    if (!blogData?.data) return null
+    
+    const rawBlog = blogData.data?.payload || blogData.data?.data || blogData.data
+    
+    if (!rawBlog) return null
+    
+    return {
+      ...rawBlog,
+      blogId: rawBlog.id,
+      authorName: rawBlog.author?.user?.name || rawBlog.authorName || 'Unknown Author',
+      authorUserId: rawBlog.author?.user?.id || rawBlog.authorUserId,
+      authorEmail: rawBlog.author?.user?.email,
+      authorDesignation: rawBlog.author?.designation,
+      authorOccupation: rawBlog.author?.occupation,
+      authorWorkplace: rawBlog.author?.workPlaceOrInstitution,
+      categoryName: rawBlog.category?.categoryName || rawBlog.categoryName,
+      categoryId: rawBlog.category?.id || rawBlog.categoryId,
+      // FIX: Proper date handling from timestamp
+      createdDate: rawBlog.creationDate || rawBlog.createdDate || 
+                   (rawBlog.creationDateTimeStamp ? new Date(rawBlog.creationDateTimeStamp).toISOString() : null),
+      lastModifiedDate: rawBlog.lastModifiedDate || 
+                       (rawBlog.lastModifiedDateTimeStamp ? new Date(rawBlog.lastModifiedDateTimeStamp).toISOString() : null)
+    }
+  }, [blogData])
+  
+  // Delete blog mutation
   const deleteBlogMutation = useDeleteBlog({
     onSuccess: () => {
       setShowDeleteModal(false)
-      // Invalidate all blog queries to refresh the list
       queryClient.invalidateQueries(['blogs'])
       queryClient.invalidateQueries(['blog'])
       alert('Blog deleted successfully!')
@@ -39,106 +116,102 @@ function BlogDetail() {
     }
   })
   
-  const [comments, setComments] = useState([])
-  const [newComment, setNewComment] = useState('')
-  const [replyTo, setReplyTo] = useState(null) // Format: { commentId, replyId } or { commentId }
-  const [replyText, setReplyText] = useState('')
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [editingComment, setEditingComment] = useState(null)
-  const [editCommentText, setEditCommentText] = useState('')
-  const [editingReply, setEditingReply] = useState(null)
-  const [editReplyText, setEditReplyText] = useState('')
-  const [newCommentsCount, setNewCommentsCount] = useState(0)
-  const [showNotification, setShowNotification] = useState(false)
-  
-  // Normalize blog data with useMemo to prevent dependency issues
-  const blog = useMemo(() => {
-    if (!blogData?.data) return null;
-    
-    // Handle different API response structures
-    const rawBlog = blogData.data?.payload || blogData.data?.data || blogData.data;
-    
-    if (!rawBlog) return null;
-    
-    return {
-      ...rawBlog,
-      blogId: rawBlog.id,
-      authorName: rawBlog.author?.user?.name || rawBlog.authorName || 'Unknown Author',
-      authorUserId: rawBlog.author?.user?.id || rawBlog.authorUserId,
-      authorEmail: rawBlog.author?.user?.email,
-      authorDesignation: rawBlog.author?.designation,
-      authorOccupation: rawBlog.author?.occupation,
-      authorWorkplace: rawBlog.author?.workPlaceOrInstitution,
-      categoryName: rawBlog.category?.categoryName || rawBlog.categoryName,
-      categoryId: rawBlog.category?.id || rawBlog.categoryId,
-      createdDate: rawBlog.creationDate || rawBlog.createdDate || (rawBlog.creationDateTimeStamp ? new Date(rawBlog.creationDateTimeStamp).toISOString() : null),
-      lastModifiedDate: rawBlog.lastModifiedDate || (rawBlog.lastModifiedDateTimeStamp ? new Date(rawBlog.lastModifiedDateTimeStamp).toISOString() : null)
+  // Comment mutations
+  const createCommentMutation = useCreateComment({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', id])
+      setNewComment('')
+    },
+    onError: (err) => {
+      console.error('Error adding comment:', err)
+      alert('Failed to post comment. Please try again.')
     }
-  }, [blogData])
+  })
   
-  // Check if user is an author (userType array includes 'AUTHOR')
-  const isAuthor = user?.userType?.includes('AUTHOR')
-  // Check if current user is the blog author - handle both API structures
+  const updateCommentMutation = useUpdateComment({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', id])
+      setEditingComment(null)
+      setEditCommentText('')
+    },
+    onError: (err) => {
+      console.error('Error updating comment:', err)
+      alert('Failed to update comment. Please try again.')
+    }
+  })
+  
+  const deleteCommentMutation = useDeleteComment({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', id])
+    },
+    onError: (err) => {
+      console.error('Error deleting comment:', err)
+      alert('Failed to delete comment. Please try again.')
+    }
+  })
+  
+  // Reply mutations
+  const createReplyMutation = useCreateReply({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', id])
+      setReplyText('')
+      setReplyTo(null)
+    },
+    onError: (err) => {
+      console.error('Error adding reply:', err)
+      alert('Failed to post reply. Please try again.')
+    }
+  })
+  
+  const updateReplyMutation = useUpdateReply({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', id])
+      setEditingReply(null)
+      setEditReplyText('')
+    },
+    onError: (err) => {
+      console.error('Error updating reply:', err)
+      alert('Failed to update reply. Please try again.')
+    }
+  })
+  
+  const deleteReplyMutation = useDeleteReply({
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', id])
+    },
+    onError: (err) => {
+      console.error('Error deleting reply:', err)
+      alert('Failed to delete reply. Please try again.')
+    }
+  })
+  
+  // Check if user is the blog author
   const isBlogAuthor = blog && user && (
     blog.author?.user?.id === user.id || 
     blog.authorUserId === user.id || 
     blog.author?.id === user.id
   )
-
-  const fetchComments = useCallback(async () => {
-    try {
-      const data = await getCommentsByBlogId(id)
-      setComments(data)
-    } catch (err) {
-      console.error('Error fetching comments:', err)
-      // Don't show error, just keep empty comments
-    }
-  }, [id])
-
-  useEffect(() => {
-    fetchComments()
-  }, [id, fetchComments])
   
-  // Poll for new comments to show notification (for authors)
+  // Poll for new comments notification (for blog authors)
   useEffect(() => {
     if (!blog || !user || !isBlogAuthor) return
     
-    const interval = setInterval(async () => {
-      try {
-        const freshComments = await getCommentsByBlogId(id)
-        if (freshComments.length > comments.length) {
-          const newCount = freshComments.length - comments.length
-          setNewCommentsCount(newCount)
-          setShowNotification(true)
-          // Auto-hide notification after 5 seconds
-          setTimeout(() => setShowNotification(false), 5000)
-        }
-      } catch {
-        // Silent fail for polling
-      }
-    }, 10000) // Check every 10 seconds
+    const previousCount = comments.length
     
-    return () => clearInterval(interval)
-  }, [blog, user, comments.length, id, isBlogAuthor])
-  
-  // Handle comments from blog response
-  useEffect(() => {
-    if (blogData?.data?.comments && Array.isArray(blogData.data.comments)) {
-      const normalizedComments = blogData.data.comments.map(comment => ({
-        commentId: comment.id,
-        content: comment.commentContent,
-        userId: comment.user?.id,
-        username: comment.user?.name,
-        userEmail: comment.user?.email,
-        createdDate: comment.creationDate,
-        replies: comment.replies || [],
-        parentCommentId: comment.parentComment
-      }))
-      setComments(normalizedComments)
+    const checkForNewComments = () => {
+      const currentCount = comments.length
+      if (currentCount > previousCount) {
+        const newCount = currentCount - previousCount
+        setNewCommentsCount(newCount)
+        setShowNotification(true)
+        setTimeout(() => setShowNotification(false), 5000)
+      }
     }
-  }, [blogData])
-
+    
+    checkForNewComments()
+  }, [blog, user, comments.length, isBlogAuthor])
   
+  // Handle blog deletion
   const handleDeleteBlog = async () => {
     try {
       deleteBlogMutation.mutate(id)
@@ -146,7 +219,8 @@ function BlogDetail() {
       console.error('Error deleting blog:', err)
     }
   }
-
+  
+  // Handle comment submission
   const handleCommentSubmit = async (e) => {
     e.preventDefault()
     if (!user) {
@@ -155,61 +229,39 @@ function BlogDetail() {
     }
     
     if (newComment.trim()) {
-      try {
-        const commentData = {
-          blogId: id,
-          userId: user.id,
-          content: newComment,
-          username: user.username // Include username for display
-        }
-        const savedComment = await addComment(commentData)
-        setComments([...comments, savedComment])
-        setNewComment('')
-      } catch (err) {
-        console.error('Error adding comment:', err)
-        alert('Failed to post comment. Please try again.')
+      const commentData = {
+        blogId: id,
+        userId: user.id,
+        content: newComment,
+        username: user.username
       }
+      createCommentMutation.mutate(commentData)
     }
   }
-
+  
+  // Handle comment editing
   const handleEditComment = (comment) => {
     setEditingComment(comment.commentId)
     setEditCommentText(comment.content)
   }
-
+  
   const handleUpdateComment = async (commentId) => {
     if (editCommentText.trim()) {
-      try {
-        const updateData = {
-          commentId,
-          content: editCommentText
-        }
-        await updateComment(updateData)
-        
-        setComments(comments.map(c => 
-          c.commentId === commentId ? { ...c, content: editCommentText } : c
-        ))
-        setEditingComment(null)
-        setEditCommentText('')
-      } catch (err) {
-        console.error('Error updating comment:', err)
-        alert('Failed to update comment. Please try again.')
+      const updateData = {
+        commentId,
+        content: editCommentText
       }
+      updateCommentMutation.mutate(updateData)
     }
   }
-
+  
   const handleDeleteComment = async (commentId) => {
     if (confirm('Are you sure you want to delete this comment?')) {
-      try {
-        await deleteComment(commentId)
-        setComments(comments.filter(c => c.commentId !== commentId))
-      } catch (err) {
-        console.error('Error deleting comment:', err)
-        alert('Failed to delete comment. Please try again.')
-      }
+      deleteCommentMutation.mutate(commentId)
     }
   }
-
+  
+  // Handle reply submission
   const handleReplySubmit = async (commentId) => {
     if (!user) {
       alert('Please sign in to reply')
@@ -217,99 +269,37 @@ function BlogDetail() {
     }
     
     if (replyText.trim()) {
-      try {
-        const replyData = {
-          commentId,
-          userId: user.id,
-          content: replyText,
-          username: user.username // Include username for display
-        }
-        const savedReply = await addReply(replyData)
-        
-        const updatedComments = comments.map(comment => {
-          if (comment.commentId === commentId) {
-            return {
-              ...comment,
-              replies: [...(comment.replies || []), savedReply]
-            }
-          }
-          return comment
-        })
-        setComments(updatedComments)
-        setReplyText('')
-        setReplyTo(null)
-      } catch (err) {
-        console.error('Error adding reply:', err)
-        alert('Failed to post reply. Please try again.')
+      const replyData = {
+        commentId,
+        userId: user.id,
+        content: replyText,
+        username: user.username
       }
+      createReplyMutation.mutate(replyData)
     }
   }
-
+  
+  // Handle reply editing
   const handleEditReply = (reply) => {
     setEditingReply(reply.replyId)
     setEditReplyText(reply.content)
   }
-
+  
   const handleUpdateReply = async (commentId, replyId) => {
     if (editReplyText.trim()) {
-      try {
-        const updateData = {
-          replyId,
-          content: editReplyText
-        }
-        await updateReply(updateData)
-        
-        setComments(comments.map(comment => {
-          if (comment.commentId === commentId) {
-            return {
-              ...comment,
-              replies: comment.replies.map(r => 
-                r.replyId === replyId ? { ...r, content: editReplyText } : r
-              )
-            }
-          }
-          return comment
-        }))
-        setEditingReply(null)
-        setEditReplyText('')
-      } catch (err) {
-        console.error('Error updating reply:', err)
-        alert('Failed to update reply. Please try again.')
+      const updateData = {
+        replyId,
+        content: editReplyText
       }
+      updateReplyMutation.mutate(updateData)
     }
   }
-
+  
   const handleDeleteReply = async (commentId, replyId) => {
     if (confirm('Are you sure you want to delete this reply?')) {
-      try {
-        await deleteReply(replyId)
-        
-        setComments(comments.map(comment => {
-          if (comment.commentId === commentId) {
-            return {
-              ...comment,
-              replies: comment.replies.filter(r => r.replyId !== replyId)
-            }
-          }
-          return comment
-        }))
-      } catch (err) {
-        console.error('Error deleting reply:', err)
-        alert('Failed to delete reply. Please try again.')
-      }
+      deleteReplyMutation.mutate(replyId)
     }
   }
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  }
-
-  console.log('BlogDetail - Current user:', user)
-  console.log('BlogDetail - userType:', user?.userType)
-  console.log('BlogDetail - isAuthor:', isAuthor)
-  console.log('BlogDetail - isBlogAuthor:', isBlogAuthor)
 
   if (isLoading) {
     return (
@@ -322,7 +312,6 @@ function BlogDetail() {
     )
   }
 
-  // Check if user is logged in - require login to view blog details
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -404,7 +393,7 @@ function BlogDetail() {
         </div>
       )}
 
-      {/* Hero Image - Responsive */}
+      {/* Hero Image */}
       <div className="relative h-64 md:h-80 lg:h-96 bg-gray-900">
         {blog.imageUrl ? (
           <img 
@@ -562,7 +551,7 @@ function BlogDetail() {
                           <p className="text-xs md:text-sm text-gray-500">{formatDate(comment.createdDate)}</p>
                         </div>
 
-                        {/* Comment Actions (Edit/Delete) - Only for comment owner */}
+                        {/* Comment Actions */}
                         {user && comment.userId === user.id && (
                           <div className="flex space-x-1 md:space-x-2 ml-2">
                             {editingComment !== comment.commentId && (
@@ -591,7 +580,7 @@ function BlogDetail() {
                         )}
                       </div>
 
-                      {/* Comment Content (Editable) */}
+                      {/* Comment Content */}
                       {editingComment === comment.commentId ? (
                         <div className="mt-2">
                           <CommentEditor
@@ -626,7 +615,7 @@ function BlogDetail() {
                         </>
                       )}
 
-                      {/* Reply Form after main comment */}
+                      {/* Reply Form */}
                       {replyTo?.commentId === comment.commentId && !replyTo?.replyId && (
                         <div className="mt-3 ml-4 md:ml-8">
                           <div className="flex items-start space-x-2">
@@ -664,7 +653,6 @@ function BlogDetail() {
                           {comment.replies.map(reply => (
                             <div key={reply.replyId} className="bg-gray-50 p-3 md:p-4 rounded-md">
                               <div className="flex items-start space-x-2">
-                                {/* Reply Avatar */}
                                 <div className="flex-shrink-0">
                                   <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-purple-100 flex items-center justify-center">
                                     <span className="text-purple-600 font-semibold text-xs">
@@ -674,14 +662,13 @@ function BlogDetail() {
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                  {/* Reply Header */}
                                   <div className="flex justify-between items-start mb-2">
                                     <div className="flex-1 min-w-0">
                                       <h5 className="font-semibold text-xs md:text-sm truncate">{reply.username}</h5>
                                       <p className="text-xs text-gray-500">{formatDate(reply.createdDate)}</p>
                                     </div>
 
-                                    {/* Reply Actions (Edit/Delete) - Only for reply owner */}
+                                    {/* Reply Actions */}
                                     {user && reply.userId === user.id && (
                                       <div className="flex space-x-1 ml-2">
                                         {editingReply !== reply.replyId && (
@@ -710,7 +697,7 @@ function BlogDetail() {
                                     )}
                                   </div>
 
-                                  {/* Reply Content (Editable) */}
+                                  {/* Reply Content */}
                                   {editingReply === reply.replyId ? (
                                     <div>
                                       <CommentEditor
@@ -733,7 +720,6 @@ function BlogDetail() {
                                     <>
                                       <p className="text-gray-700 text-xs md:text-sm mb-2 break-words">{reply.content}</p>
                                       
-                                      {/* Reply Button for nested replies */}
                                       {user && (
                                         <button
                                           onClick={() => setReplyTo({ commentId: comment.commentId, replyId: reply.replyId })}
@@ -745,7 +731,7 @@ function BlogDetail() {
                                     </>
                                   )}
 
-                                  {/* Reply Form under this specific reply */}
+                                  {/* Nested Reply Form */}
                                   {replyTo?.commentId === comment.commentId && replyTo?.replyId === reply.replyId && (
                                     <div className="mt-3">
                                       <div className="flex items-start space-x-2">

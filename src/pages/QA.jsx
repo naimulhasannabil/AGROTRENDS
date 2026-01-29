@@ -21,7 +21,340 @@ import {
   useDeleteAnswer
 } from '../services/query/answer'
 
+// Utility function for date formatting
+const formatDate = (dateString) => {
+  if (!dateString) return 'Unknown date'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
 
+// Component to render nested replies (Facebook-style)
+const NestedReply = ({ 
+  reply, 
+  questionId, 
+  depth = 0,
+  replyText,
+  setReplyText,
+  replyingTo,
+  setReplyingTo,
+  editingAnswer,
+  setEditingAnswer,
+  editAnswerContent,
+  setEditAnswerContent,
+  handleReplyToAnswer,
+  handleUpdateAnswer,
+  handleDeleteAnswer,
+  handleEditAnswer,
+  user,
+  allRepliesMap
+}) => {
+  const replyId = reply.answerId || reply.id
+  const isReplyOwner = user && (reply.userId === user.id)
+  const isEditingReply = editingAnswer === replyId
+  const isReplyingToThis = replyingTo === replyId
+  
+  // Get nested replies from the map
+  const nestedReplies = allRepliesMap[replyId] || []
+  
+  return (
+    <div className={`${depth > 0 ? 'ml-8 mt-3' : 'mt-3'} pl-4 border-l-2 border-gray-200`}>
+      <div className="bg-gray-50 p-3 rounded-lg">
+        {isEditingReply ? (
+          <div className="space-y-2">
+            <CommentEditor
+              value={editAnswerContent}
+              onChange={(e) => {
+                const newValue = e?.target?.value ?? e
+                setEditAnswerContent(newValue)
+              }}
+              onSubmit={() => handleUpdateAnswer(questionId, replyId)}
+              placeholder="Edit your reply..."
+              submitLabel="Save"
+              rows={3}
+              size="small"
+              onCancel={() => { 
+                setEditingAnswer(null)
+                setEditAnswerContent('') 
+              }}
+              showCancel={true}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-gray-700 flex-1 text-sm">{reply.answerContent || reply.content}</p>
+              {isReplyOwner && (
+                <div className="flex gap-1 ml-2">
+                  <button
+                    onClick={() => handleEditAnswer(reply)}
+                    className="p-1 text-blue-600 hover:bg-blue-100 rounded text-xs"
+                    title="Edit reply"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteAnswer(questionId, replyId)}
+                    className="p-1 text-red-600 hover:bg-red-100 rounded text-xs"
+                    title="Delete reply"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+              <span className="font-medium">{reply.username || 'Unknown User'}</span>
+              <span>{formatDate(reply.createdDate)}</span>
+            </div>
+            {user && (
+              <button
+                onClick={() => setReplyingTo(replyingTo === replyId ? null : replyId)}
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+              >
+                {isReplyingToThis ? 'Cancel' : 'Reply'}
+              </button>
+            )}
+            
+            {/* Reply Form */}
+            {isReplyingToThis && (
+              <div className="mt-3">
+                <CommentEditor
+                  value={replyText[replyId] || ''}
+                  onChange={(e) => {
+                    const newValue = e?.target?.value ?? e
+                    setReplyText(prev => ({ ...prev, [replyId]: newValue }))
+                  }}
+                  onSubmit={() => handleReplyToAnswer(questionId, replyId)}
+                  placeholder="Write your reply..."
+                  submitLabel="Post Reply"
+                  rows={2}
+                  size="small"
+                  onCancel={() => setReplyingTo(null)}
+                  showCancel={true}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      
+      {/* Render nested replies recursively */}
+      {nestedReplies.length > 0 && (
+        <div>
+          {nestedReplies.map((nestedReply) => (
+            <NestedReply
+              key={nestedReply.answerId || nestedReply.id}
+              reply={nestedReply}
+              questionId={questionId}
+              depth={depth + 1}
+              replyText={replyText}
+              setReplyText={setReplyText}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              editingAnswer={editingAnswer}
+              setEditingAnswer={setEditingAnswer}
+              editAnswerContent={editAnswerContent}
+              setEditAnswerContent={setEditAnswerContent}
+              handleReplyToAnswer={handleReplyToAnswer}
+              handleUpdateAnswer={handleUpdateAnswer}
+              handleDeleteAnswer={handleDeleteAnswer}
+              handleEditAnswer={handleEditAnswer}
+              user={user}
+              allRepliesMap={allRepliesMap}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Component to render a single answer with its replies
+const AnswerItem = ({ 
+  answer, 
+  questionId,
+  replyText,
+  setReplyText,
+  replyingTo,
+  setReplyingTo,
+  editingAnswer,
+  setEditingAnswer,
+  editAnswerContent,
+  setEditAnswerContent,
+  expandedReplies,
+  toggleReplies,
+  handleReplyToAnswer,
+  handleUpdateAnswer,
+  handleDeleteAnswer,
+  handleEditAnswer,
+  user,
+  allAnswers
+}) => {
+  const answerId = answer.answerId || answer.id
+  const isAnswerOwner = user && (answer.userId === user.id)
+  const isEditingAnswer = editingAnswer === answerId
+  const isReplyingToThis = replyingTo === answerId
+  
+  // Build a map of replies grouped by parentAnswerId
+  const allRepliesMap = useMemo(() => {
+    const map = {}
+    if (Array.isArray(allAnswers)) {
+      allAnswers.forEach(ans => {
+        const parentId = ans.parentAnswerId
+        if (parentId) {
+          if (!map[parentId]) {
+            map[parentId] = []
+          }
+          map[parentId].push(ans)
+        }
+      })
+    }
+    return map
+  }, [allAnswers])
+  
+  // Get direct replies (children of this answer)
+  const directReplies = allRepliesMap[answerId] || []
+  
+  return (
+    <div key={answerId} className="bg-white p-4 rounded-lg border border-gray-200">
+      {isEditingAnswer ? (
+        <div className="space-y-2">
+          <CommentEditor
+            value={editAnswerContent}
+            onChange={(e) => {
+              const newValue = e?.target?.value ?? e
+              setEditAnswerContent(newValue)
+            }}
+            onSubmit={() => handleUpdateAnswer(questionId, answerId)}
+            placeholder="Edit your answer..."
+            submitLabel="Save"
+            rows={3}
+            size="medium"
+            onCancel={() => { 
+              setEditingAnswer(null)
+              setEditAnswerContent('') 
+            }}
+            showCancel={true}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-gray-700 flex-1">{answer.answerContent || answer.content}</p>
+            {isAnswerOwner && (
+              <div className="flex gap-1 ml-2">
+                <button
+                  onClick={() => handleEditAnswer(answer)}
+                  className="p-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
+                  title="Edit answer"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleDeleteAnswer(questionId, answerId)}
+                  className="p-1 text-red-600 hover:bg-red-50 rounded text-xs"
+                  title="Delete answer"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+            <span>Answered by {answer.username || 'Unknown User'}</span>
+            <span>{formatDate(answer.createdDate)}</span>
+          </div>
+          
+          {/* Reply button and count */}
+          <div className="flex items-center gap-3">
+            {user && (
+              <button
+                onClick={() => setReplyingTo(replyingTo === answerId ? null : answerId)}
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+              >
+                {isReplyingToThis ? 'Cancel Reply' : 'Reply'}
+              </button>
+            )}
+            {directReplies.length > 0 && (
+              <button
+                onClick={() => toggleReplies(answerId)}
+                className="text-xs text-gray-600 hover:text-gray-800 font-medium flex items-center gap-1"
+              >
+                <span>{directReplies.length} {directReplies.length === 1 ? 'reply' : 'replies'}</span>
+                <svg 
+                  className={`w-3 h-3 transform transition-transform ${expandedReplies.has(answerId) ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+          </div>
+          
+          {/* Reply Form */}
+          {isReplyingToThis && (
+            <div className="mt-3 pl-4 border-l-2 border-primary-200">
+              <CommentEditor
+                value={replyText[answerId] || ''}
+                onChange={(e) => {
+                  const newValue = e?.target?.value ?? e
+                  setReplyText(prev => ({ ...prev, [answerId]: newValue }))
+                }}
+                onSubmit={() => handleReplyToAnswer(questionId, answerId)}
+                placeholder="Write your reply..."
+                submitLabel="Post Reply"
+                rows={2}
+                size="small"
+                onCancel={() => setReplyingTo(null)}
+                showCancel={true}
+              />
+            </div>
+          )}
+          
+          {/* Nested Replies - Facebook Style */}
+          {expandedReplies.has(answerId) && directReplies.length > 0 && (
+            <div className="mt-4">
+              {directReplies.map((reply) => (
+                <NestedReply
+                  key={reply.answerId || reply.id}
+                  reply={reply}
+                  questionId={questionId}
+                  depth={0}
+                  replyText={replyText}
+                  setReplyText={setReplyText}
+                  replyingTo={replyingTo}
+                  setReplyingTo={setReplyingTo}
+                  editingAnswer={editingAnswer}
+                  setEditingAnswer={setEditingAnswer}
+                  editAnswerContent={editAnswerContent}
+                  setEditAnswerContent={setEditAnswerContent}
+                  handleReplyToAnswer={handleReplyToAnswer}
+                  handleUpdateAnswer={handleUpdateAnswer}
+                  handleDeleteAnswer={handleDeleteAnswer}
+                  handleEditAnswer={handleEditAnswer}
+                  user={user}
+                  allRepliesMap={allRepliesMap}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// MAIN COMPONENT
 function QA() {
   const { user } = useAuth()
   
@@ -54,11 +387,12 @@ function QA() {
   // Answer states
   const [expandedQuestions, setExpandedQuestions] = useState(new Set())
   const [currentQuestionId, setCurrentQuestionId] = useState(null)
-  const [answerText, setAnswerText] = useState({}) // { questionId: text }
-  const [replyText, setReplyText] = useState({}) // { answerId: text }
+  const [answerText, setAnswerText] = useState({})
+  const [replyText, setReplyText] = useState({})
   const [editingAnswer, setEditingAnswer] = useState(null)
   const [editAnswerContent, setEditAnswerContent] = useState('')
   const [replyingTo, setReplyingTo] = useState(null)
+  const [expandedReplies, setExpandedReplies] = useState(new Set())
   
   // React Query mutations for answers
   const createAnswerMutation = useCreateAnswer()
@@ -71,15 +405,6 @@ function QA() {
   
   // Get questions from React Query
   const questions = allQuestionsData?.payload?.content || allQuestionsData?.content || []
-  
-  // Check user role
-  const isAuthor = user?.userType?.includes('AUTHOR')
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown date'
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
   
   const toggleQuestion = (questionId) => {
     if (!questionId) return
@@ -99,7 +424,15 @@ function QA() {
     setExpandedQuestions(newExpanded)
   }
 
-
+  const toggleReplies = (answerId) => {
+    const newExpanded = new Set(expandedReplies)
+    if (newExpanded.has(answerId)) {
+      newExpanded.delete(answerId)
+    } else {
+      newExpanded.add(answerId)
+    }
+    setExpandedReplies(newExpanded)
+  }
 
   const handleAddAnswer = (questionId) => {
     if (!user) {
@@ -107,17 +440,6 @@ function QA() {
         title: 'Authentication Required',
         description: 'Please sign in to answer questions',
         placement: 'topRight'
-      })
-      return
-    }
-
-    // Only AUTHORS can answer questions
-    if (!isAuthor) {
-      notification.info({
-        title: 'Authors Only',
-        description: 'Only authors (experts) can answer questions. You can reply to existing answers.',
-        placement: 'topRight',
-        duration: 5
       })
       return
     }
@@ -145,7 +467,7 @@ function QA() {
         refetchQuestions()
         notification.success({
           title: 'Answer Posted',
-          description: 'Your expert answer has been added successfully!',
+          description: 'Your answer has been added successfully!',
           placement: 'topRight'
         })
       },
@@ -184,7 +506,7 @@ function QA() {
       questionId: questionId,
       userId: user.id,
       parentAnswerId: parentAnswerId,
-      content: content  // Try 'content' instead of 'answerContent'
+      content: content
     }
 
     replyToAnswerMutation.mutate(replyData, {
@@ -192,6 +514,8 @@ function QA() {
         setReplyText(prev => ({ ...prev, [parentAnswerId]: '' }))
         setReplyingTo(null)
         refetchAnswers()
+        // Automatically expand replies to show the new reply
+        setExpandedReplies(prev => new Set([...prev, parentAnswerId]))
         notification.success({
           title: 'Reply Posted',
           description: 'Your reply has been added successfully!',
@@ -226,7 +550,7 @@ function QA() {
 
     const updateData = {
       answerId: answerId,
-      content: editAnswerContent  // Try 'content' instead of 'answerContent'
+      content: editAnswerContent
     }
 
     updateAnswerMutation.mutate(updateData, {
@@ -261,20 +585,18 @@ function QA() {
       return
     }
 
-    // Check if we have a valid answer ID from backend
-    if (!answerId || answerId.toString().startsWith('temp-')) {
+    if (!answerId) {
       notification.error({
         title: 'Cannot Delete Answer',
-        description: 'Backend API error: Answer ID is missing. Please contact the administrator to fix the /api/answers/question endpoint to include the answer ID field.',
-        placement: 'topRight',
-        duration: 8
+        description: 'Answer ID is missing. Please try again.',
+        placement: 'topRight'
       })
       return
     }
 
     Modal.confirm({
       title: 'Delete Answer',
-      content: 'Are you sure you want to delete this answer?',
+      content: 'Are you sure you want to delete this answer? This will also delete all replies to this answer.',
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
@@ -394,21 +716,42 @@ function QA() {
     e.preventDefault()
     
     if (!user) {
-      alert('Please sign in to ask a question')
+      notification.warning({
+        title: 'Authentication Required',
+        description: 'Please sign in to ask a question',
+        placement: 'topRight'
+      })
+      return
+    }
+    
+    if (!title.trim()) {
+      notification.warning({
+        title: 'Title Required',
+        description: 'Please enter a question title',
+        placement: 'topRight'
+      })
+      return
+    }
+    
+    if (!question.trim()) {
+      notification.warning({
+        title: 'Content Required',
+        description: 'Please enter question content',
+        placement: 'topRight'
+      })
       return
     }
     
     const questionData = {
+      userId: user.id,
       title: title.trim(),
       content: question.trim()
     }
     
     createQuestionMutation.mutate(questionData, {
       onSuccess: () => {
-        // Reset form
         setTitle('')
         setQuestion('')
-        
         refetchQuestions()
         notification.success({
           title: 'Question Posted',
@@ -418,16 +761,17 @@ function QA() {
       },
       onError: (error) => {
         console.error('Error submitting question:', error)
+        console.error('Error response:', error.response?.data)
         notification.error({
           title: 'Submission Failed',
-          description: 'Failed to submit question. Please try again.',
+          description: error.response?.data?.message || 'Failed to submit question. Please try again.',
           placement: 'topRight'
         })
       }
     })
   }
   
-  // Quill editor modules - same as BlogForm
+  // Quill editor modules
   const modules = useMemo(() => ({
     toolbar: {
       container: [
@@ -463,7 +807,7 @@ function QA() {
         backgroundClass="bg-[#DAFCE7]"
       />
       
-      {/* Ask Question Section - Only for logged-in users */}
+      {/* Ask Question Section */}
       <section className="py-12 bg-white">
         <div className="container-custom max-w-4xl">
           <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 md:p-8">
@@ -483,7 +827,6 @@ function QA() {
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
-                {/* Title */}
                 <div className="mb-6">
                   <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
                     Title *
@@ -499,7 +842,6 @@ function QA() {
                   />
                 </div>
 
-                {/* Content */}
                 <div className="mb-6">
                   <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
                     Content *
@@ -511,7 +853,7 @@ function QA() {
                       onChange={setQuestion}
                       modules={modules}
                       formats={formats}
-                      placeholder="Write your blog content here..."
+                      placeholder="Write your question content here..."
                       className="bg-white"
                     />
                   </div>
@@ -520,7 +862,6 @@ function QA() {
                   </p>
                 </div>
 
-                {/* Actions */}
                 <div className="flex justify-end space-x-4">
                   <button
                     type="button"
@@ -546,7 +887,7 @@ function QA() {
         </div>
       </section>
       
-      {/* My Questions - Grid View (Simplified - Only Title and Content) */}
+      {/* My Questions */}
       {user && (
         <section className="py-12 bg-gray-50">
           <div className="container-custom">
@@ -577,7 +918,6 @@ function QA() {
                   ))}
                 </div>
                 
-                {/* Pagination Info */}
                 {userQuestionsData?.payload?.totalElements && (
                   <div className="text-center mt-8 text-gray-600">
                     <p>
@@ -604,7 +944,6 @@ function QA() {
           <h2 className="text-3xl font-bold text-center mb-12">Community Questions</h2>
           
           {!user ? (
-            /* Show sign-up message when user is not logged in */
             <div className="text-center py-16 max-w-2xl mx-auto">
               <div className="bg-white rounded-lg shadow-lg p-8">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mx-auto text-primary-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -647,18 +986,24 @@ function QA() {
                 const isEditing = editingQuestion === questionId
                 const isExpanded = expandedQuestions.has(questionId)
                 
-                // Safely parse answers data - ensure it's always an array
-                let answers = []
+                // Get all answers for this question
+                let allAnswers = []
+                let topLevelAnswers = []
                 if (currentQuestionId === questionId && answersData) {
-                  const data = answersData?.payload || answersData?.content || answersData
-                  answers = Array.isArray(data) ? data : []
+                  const rawData = answersData?.payload || answersData?.content || answersData
+                  allAnswers = Array.isArray(rawData) ? rawData : []
+                  
+                  // Filter top-level answers (no parentAnswerId)
+                  topLevelAnswers = allAnswers.filter(answer => {
+                    const parentId = answer.parentAnswerId
+                    return parentId === null || parentId === undefined || parentId === 0
+                  })
                 }
                 
                 return (
                   <div key={questionId} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                     <div className="p-6">
                       {isEditing ? (
-                        // Edit Mode
                         <div className="space-y-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
@@ -702,7 +1047,6 @@ function QA() {
                           </div>
                         </div>
                       ) : (
-                        // View Mode
                         <>
                           <div className="flex justify-between items-start mb-4">
                             <h3 className="text-xl font-semibold text-gray-800 flex-1 cursor-pointer hover:text-primary-600" onClick={() => toggleQuestion(questionId)}>
@@ -762,140 +1106,57 @@ function QA() {
                     {/* Answers Section */}
                     {isExpanded && !isEditing && (
                       <div className="border-t border-gray-200 bg-gray-50 p-6">
-                        {/* Add Answer Form - Only for AUTHOR users */}
-                        {isAuthor ? (
-                          <div className="mb-6 bg-white p-4 rounded-lg border border-gray-200">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              ✍️ Your Expert Answer
-                            </label>
-                            <CommentEditor
-                              value={answerText[questionId] || ''}
-                              onChange={(e) => setAnswerText({ ...answerText, [questionId]: e.target.value })}
-                              onSubmit={() => handleAddAnswer(questionId)}
-                              placeholder="Share your expert knowledge..."
-                              submitLabel="Post Expert Answer"
-                              rows={3}
-                              size="medium"
-                            />
-                          </div>
-                        ) : user ? (
-                          <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                            <p className="text-blue-800 text-sm">💡 Only authors (experts) can answer questions. You can reply to their answers below.</p>
-                          </div>
-                        ) : (
-                          <div className="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                            <p className="text-yellow-800 text-sm">Please sign in to interact with answers</p>
-                          </div>
-                        )}
+                        <div className="mb-6 bg-white p-4 rounded-lg border border-gray-200">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Your Answer
+                          </label>
+                          <CommentEditor
+                            value={answerText[questionId] || ''}
+                            onChange={(e) => {
+                              const newValue = e?.target?.value ?? e
+                              setAnswerText(prev => ({ ...prev, [questionId]: newValue }))
+                            }}
+                            onSubmit={() => handleAddAnswer(questionId)}
+                            placeholder="Share your knowledge..."
+                            submitLabel="Post Answer"
+                            rows={3}
+                            size="medium"
+                          />
+                        </div>
                         
-                        {/* Answers List */}
                         <div className="space-y-4">
-                          <h4 className="font-semibold text-gray-800">{answers.length} {answers.length === 1 ? 'Answer' : 'Answers'}</h4>
+                          <h4 className="font-semibold text-gray-800">{topLevelAnswers.length} {topLevelAnswers.length === 1 ? 'Answer' : 'Answers'}</h4>
                           
                           {(currentQuestionId === questionId && isLoadingAnswers) ? (
                             <div className="flex justify-center py-8">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                             </div>
-                          ) : !Array.isArray(answers) || answers.length === 0 ? (
+                          ) : !Array.isArray(topLevelAnswers) || topLevelAnswers.length === 0 ? (
                             <p className="text-gray-500 text-center py-8">No answers yet. Be the first to answer!</p>
                           ) : (
-                            Array.isArray(answers) && answers.map((answer, index) => {
-                              // BACKEND ISSUE: API doesn't return answer ID
-                              // Using index as temporary key until backend is fixed
-                              const answerId = answer.id || answer.answerId || `temp-${index}`
-                              const isAnswerOwner = user && (answer.userId === user.id)
-                              const isEditingAnswer = editingAnswer === answerId
-                              const isReplyingToThis = replyingTo === answerId
-                              
-                              return (
-                                <div key={answerId} className="bg-white p-4 rounded-lg border border-gray-200">
-                                  {isEditingAnswer ? (
-                                    <div className="space-y-2">
-                                      <textarea
-                                        rows="3"
-                                        value={editAnswerContent}
-                                        onChange={(e) => setEditAnswerContent(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                      />
-                                      <div className="flex gap-2">
-                                        <button
-                                          onClick={() => handleUpdateAnswer(questionId, answerId)}
-                                          className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
-                                        >
-                                          Save
-                                        </button>
-                                        <button
-                                          onClick={() => { setEditingAnswer(null); setEditAnswerContent('') }}
-                                          className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex justify-between items-start mb-2">
-                                        <p className="text-gray-700 flex-1">{answer.answerContent || answer.content}</p>
-                                        {isAnswerOwner && (
-                                          <div className="flex gap-1 ml-2">
-                                            <button
-                                              onClick={() => handleEditAnswer(answer)}
-                                              className="p-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
-                                              title="Edit answer"
-                                            >
-                                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                              </svg>
-                                            </button>
-                                            <button
-                                              onClick={() => handleDeleteAnswer(questionId, answerId)}
-                                              className="p-1 text-red-600 hover:bg-red-50 rounded text-xs"
-                                              title="Delete answer"
-                                            >
-                                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                              </svg>
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                                        <span>Answered by {answer.username || 'Unknown User'}</span>
-                                        <span>{formatDate(answer.createdDate)}</span>
-                                      </div>
-                                      {user && (
-                                        <button
-                                          onClick={() => setReplyingTo(replyingTo === answerId ? null : answerId)}
-                                          className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                                        >
-                                          {isReplyingToThis ? 'Cancel Reply' : 'Reply'}
-                                        </button>
-                                      )}
-                                      
-                                      {/* Reply Form */}
-                                      {isReplyingToThis && (
-                                        <div className="mt-3 pl-4 border-l-2 border-primary-200 relative">
-                                          <div className="relative z-10">
-                                            <CommentEditor
-                                              value={replyText[answerId] || ''}
-                                              onChange={(e) => setReplyText({ ...replyText, [answerId]: e.target.value })}
-                                              onSubmit={() => handleReplyToAnswer(questionId, answerId)}
-                                              onCancel={() => setReplyingTo(null)}
-                                              placeholder="Write your reply..."
-                                              submitLabel="Post Reply"
-                                              showCancel={true}
-                                              rows={2}
-                                              size="small"
-                                              emojiPosition="top"
-                                            />
-                                          </div>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              )
-                            })
+                            topLevelAnswers.map((answer) => (
+                              <AnswerItem
+                                key={answer.answerId || answer.id}
+                                answer={answer}
+                                questionId={questionId}
+                                replyText={replyText}
+                                setReplyText={setReplyText}
+                                replyingTo={replyingTo}
+                                setReplyingTo={setReplyingTo}
+                                editingAnswer={editingAnswer}
+                                setEditingAnswer={setEditingAnswer}
+                                editAnswerContent={editAnswerContent}
+                                setEditAnswerContent={setEditAnswerContent}
+                                expandedReplies={expandedReplies}
+                                toggleReplies={toggleReplies}
+                                handleReplyToAnswer={handleReplyToAnswer}
+                                handleUpdateAnswer={handleUpdateAnswer}
+                                handleDeleteAnswer={handleDeleteAnswer}
+                                handleEditAnswer={handleEditAnswer}
+                                user={user}
+                                allAnswers={allAnswers}
+                              />
+                            ))
                           )}
                         </div>
                       </div>

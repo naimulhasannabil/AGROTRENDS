@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { formatDate } from '../utils/dateUtils'
 
 function BlogCard({ blog = {} }) {
   const { 
@@ -7,8 +8,8 @@ function BlogCard({ blog = {} }) {
     title = 'Untitled', 
     authorName,
     author = 'Unknown', 
-    createdDate,
-    date = 'N/A', 
+    // createdDate,
+    // date = 'N/A', 
     content,
     excerpt = '', 
     imageUrl,
@@ -32,11 +33,11 @@ function BlogCard({ blog = {} }) {
   const displayAuthor = typeof authorName === 'string' 
     ? authorName 
     : (authorName?.user?.name || authorName?.user?.firstName || (typeof author === 'object' ? (author?.user?.name || author?.user?.firstName || 'Unknown') : author) || 'Unknown')
-  const displayDate = createdDate ? new Date(createdDate).toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  }) : date
+  // const displayDate = createdDate ? new Date(createdDate).toLocaleDateString('en-US', { 
+  //   year: 'numeric', 
+  //   month: 'long', 
+  //   day: 'numeric' 
+  // }) : date
   // Strip HTML tags and entities from content
   const cleanContent = stripHtml(content || excerpt);
   const displayExcerpt = cleanContent ? cleanContent.substring(0, 150) + (cleanContent.length > 150 ? '...' : '') : ''
@@ -66,7 +67,7 @@ function BlogCard({ blog = {} }) {
         <p className="text-gray-600 mb-4 line-clamp-3">{displayExcerpt}</p>
         <div className="flex justify-between items-center">
           <div className="text-sm text-gray-500">
-            By {displayAuthor} | {displayDate}
+            By {displayAuthor} | {formatDate(blog.createdDate || blog.lastModifiedDate)}
           </div>
           <Link to={`/blogs/${displayId}`} className="text-primary-600 hover:text-primary-800 font-medium inline-flex items-center">
             Read More 
