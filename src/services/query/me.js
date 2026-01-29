@@ -21,9 +21,23 @@ export const useMe = () => {
     },
   });
 };
+
+export const useUserByEmail = (email) => {
+  return useQuery({
+    queryKey: ["user", "email", email],
+    queryFn: async () => {
+      const { data } = await api.get("/api/user/get", {
+        params: { email, lang: "en" },
+      });
+      return data.payload;
+    },
+    enabled: !!email,
+  });
+};
+
 export const useUserById = (userId) => {
   return useQuery({
-    queryKey: ["user", userId],
+    queryKey: ["user", "id", userId],
     queryFn: async () => {
       const { data } = await api.get(`/api/user/id/${userId}`, {
         params: { lang: "en" },
