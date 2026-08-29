@@ -444,7 +444,7 @@ npm run test:ai     # Test AI integrations
 - Mobile usage: 68% of traffic
 
 ### AI Performance
-- **Gemini Response Time**: < 3 seconds average
+- **Response Time**: < 3 seconds average
 - **AI Availability**: 99.5% uptime with fallback system
 - **User Satisfaction**: 4.8/5 stars for AI assistance
 - **Query Success Rate**: 95% successful AI responses
@@ -452,6 +452,6 @@ npm run test:ai     # Test AI integrations
 
 ---
 
-**Built with ❤️ and 🤖 Gemini AI for the farming community**
+
 
 *Empowering sustainable agriculture through AI technology and knowledge sharing*
